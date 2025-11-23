@@ -56,7 +56,7 @@ class Station(models.Model):
 
 class Pump(models.Model):
     pump_id = models.AutoField(primary_key=True)
-    station_id= models.ForeignKey(Station, on_delete=models.CASCADE, related_name='pumps')
+    station= models.ForeignKey(Station, on_delete=models.CASCADE, related_name='pumps')
     pump_number = models.IntegerField()
     fuel_type = models.CharField(max_length=50)
     STATUS_CHOICES = [
