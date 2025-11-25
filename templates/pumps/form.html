@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h2>{% if object %}Update Pump{% else %}Create New Pump{% endif %}</h2>
+    
+    <form method="post">
+        {% csrf_token %}
+        
+        {% for field in form %}
+        <div class="form-group">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+            <div class="error">{{ field.errors }}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+        
+        <button type="submit" class="btn btn-primary">
+            {% if object %}Update{% else %}Create{% endif %} Pump
+        </button>
+        <a href="{% url 'pump_list' %}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

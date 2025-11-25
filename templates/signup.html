@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Fuel Station</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .signup-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .signup-header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 2.5rem 2rem;
+            text-align: center;
+        }
+
+        .signup-header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .signup-header p {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        .signup-form {
+            padding: 2.5rem 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #2c3e50;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s;
+            background: #f8f9fa;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #3498db;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .select-control {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: #f8f9fa;
+            cursor: pointer;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 1.5rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(52, 152, 219, 0.3);
+        }
+
+        .login-link {
+            text-align: center;
+            color: #7f8c8d;
+        }
+
+        .login-link a {
+            color: #3498db;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .login-link a:hover {
+            text-decoration: underline;
+        }
+
+        .messages {
+            margin-bottom: 1.5rem;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border: 2px solid transparent;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+
+        @media (max-width: 480px) {
+            .signup-container {
+                margin: 1rem;
+            }
+            
+            .signup-header {
+                padding: 2rem 1.5rem;
+            }
+            
+            .signup-form {
+                padding: 2rem 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="signup-container">
+        <div class="signup-header">
+            <h1>Fuel Station</h1>
+            <p>Create your account</p>
+        </div>
+        
+        <div class="signup-form">
+            {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}error{% else %}success{% endif %}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <form method="POST">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="full_name">Full Name</label>
+                    <input type="text" id="full_name" name="full_name" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="role">Account Type</label>
+                    <select id="role" name="role" class="select-control" required>
+                        <option value="manager">Station Manager</option>
+                        <option value="owner">Station Owner</option>
+                        <option value="admin">Administrator</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn">Create Account</button>
+                
+                <div class="login-link">
+                    Already have an account? <a href="{% url 'landing_page' %}">Login here</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Simple form validation
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('form');
+            const password = document.getElementById('password');
+            
+            form.addEventListener('submit', function(e) {
+                if (password.value.length < 6) {
+                    e.preventDefault();
+                    alert('Password must be at least 6 characters long');
+                    password.focus();
+                }
+            });
+            
+            // Auto-hide messages after 5 seconds
+            const messages = document.querySelectorAll('.alert');
+            messages.forEach(message => {
+                setTimeout(() => {
+                    message.style.opacity = '0';
+                    message.style.transition = 'opacity 0.5s';
+                    setTimeout(() => message.remove(), 500);
+                }, 5000);
+            });
+        });
+    </script>
+</body>
+</html>

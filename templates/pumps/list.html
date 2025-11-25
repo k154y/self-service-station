@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h2>Pump Management</h2>
+    
+    <div class="header-actions">
+        <a href="{% url 'pump_create' %}" class="btn btn-primary">Add New Pump</a>
+    </div>
+
+    <div class="pumps-grid">
+        {% for pump in pumps %}
+        <div class="pump-card {{ pump.status }}">
+            <h4>Pump {{ pump.pump_number }}</h4>
+            <p><strong>Station:</strong> {{ pump.station.name }}</p>
+            <p><strong>Fuel Type:</strong> {{ pump.fuel_type }}</p>
+            <p><strong>Status:</strong> 
+                <span class="status-badge {{ pump.status }}">{{ pump.status|title }}</span>
+            </p>
+            
+            <div class="actions">
+                <a href="{% url 'pump_status_update' pump.pump_id %}" class="btn btn-sm btn-warning">Update Status</a>
+                <a href="{% url 'pump_update' pump.pump_id %}" class="btn btn-sm btn-secondary">Edit</a>
+                <a href="{% url 'pump_delete' pump.pump_id %}" class="btn btn-sm btn-danger">Delete</a>
+            </div>
+        </div>
+        {% empty %}
+        <p>No pumps found.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

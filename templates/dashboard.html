@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Station Control Center{% endblock %}
+{% block page_description %}Real-time monitoring and management dashboard{% endblock %}
+
+{% block header_actions %}
+<div style="display: flex; gap: 1rem;">
+    <a href="{% url 'transaction_create' %}" class="btn btn-primary">➕ New Transaction</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">{{ today_revenue|floatformat:0 }} RWF</div>
+            <div class="stat-label">Today's Revenue</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ petrol_dispensed|floatformat:1 }} L</div>
+            <div class="stat-label">Petrol Dispensed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ diesel_dispensed|floatformat:1 }} L</div>
+            <div class="stat-label">Diesel Dispensed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ active_pumps_count }}/{{ pumps.count }}</div>
+            <div class="stat-label">Active Pumps</div>
+        </div>
+    </div>
+
+    <!-- Alerts Section -->
+    {% if alerts %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">🔔 Active Alerts</h3>
+            <span>Requires your attention</span>
+        </div>
+        <div style="padding: 1rem;">
+            {% for alert in alerts %}
+            <div style="display: flex; justify-content: between; align-items: center; padding: 1rem; background: #fff3cd; border-radius: 8px; margin-bottom: 0.5rem;">
+                <div>
+                    <strong>{{ alert.get_type_display }}</strong> - {{ alert.description }}
+                </div>
+                <a href="{% url 'alert_update' alert.alert_id %}" class="btn btn-warning btn-sm">Resolve</a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Pump Status -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">⛽ Pump Monitoring</h3>
+            <span>Real-time pump status and control</span>
+        </div>
+        <div class="pumps-grid">
+            {% for pump in pumps %}
+            <div class="pump-card {% if pump.status == 'offline' %}offline{% endif %}">
+                <h4>Pump {{ pump.pump_number }}</h4>
+                <p><strong>Fuel Type:</strong> {{ pump.fuel_type }}</p>
+                <p><strong>Status:</strong> 
+                    <span class="status-badge {% if pump.status == 'active' %}status-active{% else %}status-offline{% endif %}">
+                        {{ pump.status|title }}
+                    </span>
+                </p>
+                <p><strong>Location:</strong> {{ pump.station.name }}</p>
+                <div class="pump-actions">
+                    <a href="{% url 'pump_status_update' pump.pump_id %}" class="btn btn-warning btn-sm">Update Status</a>
+                </div>
+            </div>
+            {% empty %}
+            <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: #7f8c8d;">
+                <p>No pumps configured yet.</p>
+                <a href="{% url 'pump_create' %}" class="btn btn-primary">Add First Pump</a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">💰 Recent Transactions</h3>
+            <a href="{% url 'transaction_list' %}" class="btn btn-secondary btn-sm">View All</a>
+        </div>
+        {% if recent_transactions %}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Fuel Type</th>
+                    <th>Quantity</th>
+                    <th>Amount</th>
+                    <th>Payment</th>
+                    <th>Car Plate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for transaction in recent_transactions %}
+                <tr>
+                    <td>{{ transaction.transaction_time|time }}</td>
+                    <td>{{ transaction.fuel_type }}</td>
+                    <td>{{ transaction.quantity }}L</td>
+                    <td>{{ transaction.total_price }} RWF</td>
+                    <td>
+                        <span class="status-badge {% if transaction.payment_method == 'cash' %}status-active{% else %}status-pending{% endif %}">
+                            {{ transaction.payment_method|title }}
+                        </span>
+                    </td>
+                    <td>{{ transaction.car_plate|default:"-" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="padding: 3rem; text-align: center; color: #7f8c8d;">
+            <p>No transactions recorded today.</p>
+            <a href="{% url 'transaction_create' %}" class="btn btn-primary">Record First Transaction</a>
+        </div>
+        {% endif %}
+    </div>
+
+    
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">⚡ Quick Actions</h3>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; padding: 1rem;">
+            <a href="{% url 'pump_create' %}" class="btn btn-primary" style="text-align: center;">
+                <div>➕</div>
+                <div>Add Pump</div>
+            </a>
+            <a href="{% url 'transaction_create' %}" class="btn btn-success" style="text-align: center;">
+                <div>💰</div>
+                <div>New Sale</div>
+            </a>
+            <a href="{% url 'inventory_list' %}" class="btn btn-warning" style="text-align: center;">
+                <div>🗃️</div>
+                <div>Check Inventory</div>
+            </a>
+            <a href="{% url 'settings_list' %}" class="btn btn-secondary" style="text-align: center;">
+                <div>⚙️</div>
+                <div>Settings</div>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-refresh dashboard every 30 seconds
+    setTimeout(function() {
+        window.location.reload();
+    }, 30000);
+
+    // Real-time updates for pump status (simulated)
+    document.addEventListener('DOMContentLoaded', function() {
+        const pumpCards = document.querySelectorAll('.pump-card');
+        
+        pumpCards.forEach(card => {
+            card.addEventListener('click', function() {
+                this.style.transform = 'scale(1.02)';
+                setTimeout(() => {
+                    this.style.transform = 'scale(1)';
+                }, 200);
+            });
+        });
+    });
+</script>
+{% endblock %}
