@@ -6,116 +6,190 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Fuel Station Management{% endblock %}</title>
-   <link rel="stylesheet" href="{% static 'css/base.css' %}">
     
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            blue: '#104097', // Deep corporate blue
+                        },
+                        // Custom colors used in the dashboard image
+                        petrol: '#00A3C9', 
+                        diesel: '#33CC66',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Ensures content is not hidden by the fixed sidebar in a flex layout */
+        .sidebar {
+             /* Fixed width for the sidebar */
+             width: 16rem; /* equivalent to w-64 */
+             min-width: 16rem;
+        }
+        .main-container {
+             /* Adjust margin to account for the fixed sidebar width (16rem = 256px) */
+             margin-left: 16rem;
+             padding: 2rem;
+        }
         
+        /* Custom scrollbar for aesthetic purposes */
+        .sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background-color: rgba(160, 160, 160, 0.5);
+            border-radius: 4px;
+        }
+        /* Mobile adjustment to hide sidebar */
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+            .main-container {
+                margin-left: 0;
+                padding: 1rem;
+            }
+        }
+    </style>
 </head>
-<body>
-    <!-- Navigation Header -->
-    <nav class="navbar">
-        <div class="navbar-content">
-            <div class="navbar-brand">
-                <h1>FUEL STATION</h1>
-                <span class="tagline">Manage your fuel station operations efficiently</span>
+<body class="bg-gray-50 text-gray-800 min-h-screen">
+    
+    {% if request.session.user_id %}
+    <div class="flex min-h-screen">
+        <aside class="sidebar bg-white border-r border-gray-100 flex flex-col py-6 shadow-xl fixed h-full overflow-y-auto">
+            
+            <div class="px-6 pb-6 border-b border-gray-100">
+                <h1 class="text-xl font-bold text-gray-900 flex items-center">
+                    <span class="mr-2 w-6 h-6 bg-brand-blue rounded-full flex items-center justify-center text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25c.348-.348.882-.047 1.056.405.09.233.056.516-.08.729-.197.307-.497.58-.871.82a1.868 1.868 0 0 1-.723.284 1.87 1.87 0 0 1-.723-.284c-.374-.24-.674-.513-.871-.82-.136-.213-.17-.496-.08-.729.174-.452.708-.753 1.056-.405z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21.75V20.25h1.5v1.5H12zM12 3h.008v.008H12V3zm-3 0a.75.75 0 100 1.5.75.75 0 000-1.5zm3 0a.75.75 0 100 1.5.75.75 0 000-1.5zm3 0a.75.75 0 100 1.5.75.75 0 000-1.5zM6 6H4.5v3h1.5V6zm9 0h-1.5v3H15V6zm-9 6H4.5v3h1.5v-3zm9 0h-1.5v3H15v-3zM9 9H7.5v3H9V9zm3 0h-1.5v3H12V9zm3 0h-1.5v3H15V9zM6 15H4.5v3h1.5v-3zm9 0h-1.5v3H15v-3zM9 18H7.5v3H9v-3zm3 0h-1.5v3H12v-3zm3 0h-1.5v3H15v-3z" />
+                        </svg>
+                    </span>
+                    FUEL STATION
+                </h1>
             </div>
             
-            {% if request.session.user_id %}
-            <div class="nav-links">
-                <div class="user-info">
-                    <span class="welcome">Welcome, {{ request.session.full_name }}</span>
-                </div>
-                <a href="{% url 'logout' %}">Logout</a>
-            </div>
-            {% endif %}
-        </div>
-    </nav>
+            <nav class="flex-grow px-4 mt-4">
+                <ul class="space-y-1">
+                    {% with current_url=request.resolver_match.url_name %}
+                    
+                    {% comment %} Dashboard {% endcomment %}
+                    <li><a href="{% url 'dashboard' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg transition-colors font-medium 
+                        {% if current_url == 'dashboard' %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
+                        <span class="mr-3 w-5 h-5"></span> Dashboard
+                    </a></li>
+                    
+                    {% comment %} Inventory {% endcomment %}
+                    <li><a href="{% url 'inventory_list' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg transition-colors font-medium 
+                        {% if 'inventory' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
+                        <span class="mr-3 w-5 h-5"></span> Inventory
+                    </a></li>
+                    
+                    {% comment %} Pumps {% endcomment %}
+                    <li><a href="{% url 'pump_list' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg transition-colors font-medium 
+                        {% if 'pump' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
+                        <span class="mr-3 w-5 h-5"></span> Pumps
+                    </a></li>
+                    
+                    {% comment %} Transactions {% endcomment %}
+                    <li><a href="{% url 'transaction_list' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg transition-colors font-medium 
+                        {% if 'transaction' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
+                        <span class="mr-3 w-5 h-5"></span> Transactions
+                    </a></li>
+                    
+                    {% comment %} Alerts {% endcomment %}
+                    <li><a href="{% url 'alert_list' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg transition-colors font-medium 
+                        {% if 'alert' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
+                        <span class="mr-3 w-5 h-5"></span> Alerts
+                    </a></li>
+                    
+                    {% comment %} Settings {% endcomment %}
+                    <li><a href="{% url 'settings_list' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg transition-colors font-medium 
+                        {% if 'settings' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
+                        <span class="mr-3 w-5 h-5"></span> Setting
+                    </a></li>
 
-    <!-- Main Content Area -->
-    <div class="main-container">
-        {% if request.session.user_id %}
-        <!-- Sidebar Navigation -->
-        <aside class="sidebar">
-            <nav>
-                <ul class="sidebar-nav">
-                    <li><a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
-                        📊 Dashboard
-                    </a></li>
-                    <li><a href="{% url 'pump_list' %}" class="{% if 'pump' in request.resolver_match.url_name %}active{% endif %}">
-                        ⛽ Pumps
-                    </a></li>
-                    <li><a href="{% url 'inventory_list' %}" class="{% if 'inventory' in request.resolver_match.url_name %}active{% endif %}">
-                        🗃️ Inventory
-                    </a></li>
-                    <li><a href="{% url 'transaction_list' %}" class="{% if 'transaction' in request.resolver_match.url_name %}active{% endif %}">
-                        💰 Transactions
-                    </a></li>
-                    <li><a href="{% url 'alert_list' %}" class="{% if 'alert' in request.resolver_match.url_name %}active{% endif %}">
-                        🔔 Alerts
-                    </a></li>
-                    <li><a href="{% url 'settings_list' %}" class="{% if 'settings' in request.resolver_match.url_name %}active{% endif %}">
-                        ⚙️ Settings
-                    </a></li>
                     {% if request.session.role == 'admin' %}
-                    <li><a href="{% url 'user_list' %}" class="{% if 'user' in request.resolver_match.url_name %}active{% endif %}">
-                        👥 Users
+                    <li class="pt-4 border-t border-gray-100 mt-4">
+                        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider px-2 mb-1">Admin Tools</p>
+                    </li>
+                    {% comment %} Users {% endcomment %}
+                    <li><a href="{% url 'user_list' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors font-medium 
+                        {% if 'user' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
+                        <span class="mr-3 w-5 h-5"></span> Users
                     </a></li>
-                    <li><a href="{% url 'company_list' %}" class="{% if 'company' in request.resolver_match.url_name %}active{% endif %}">
-                        🏢 Companies
+                    {% comment %} Companies {% endcomment %}
+                    <li><a href="{% url 'company_list' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors font-medium 
+                        {% if 'company' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
+                        <span class="mr-3 w-5 h-5"></span> Companies
                     </a></li>
-                    <li><a href="{% url 'station_list' %}" class="{% if 'station' in request.resolver_match.url_name %}active{% endif %}">
-                        🏭 Stations
+                    {% comment %} Stations {% endcomment %}
+                    <li><a href="{% url 'station_list' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors font-medium 
+                        {% if 'station' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
+                        <span class="mr-3 w-5 h-5"></span> Stations
                     </a></li>
                     {% endif %}
+                    
+                    {% endwith %}
                 </ul>
             </nav>
+            
+            <div class="px-4 mt-auto pt-4 border-t border-gray-100">
+                <a href="{% url 'logout' %}" class="flex items-center w-full px-2 py-2.5 text-red-500 rounded-lg hover:bg-red-50 transition-colors font-medium">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 mr-3">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3-9h.008v.008h-.008V6zm-3 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+                    </svg>
+                    Log out
+                </a>
+            </div>
         </aside>
-        {% endif %}
 
-        <!-- Main Content -->
-        <main class="content">
-            {% if request.session.user_id %}
-            <div class="content-header">
+        <main class="main-container flex-grow">
+            
+            <div class="flex justify-between items-start pb-4 mb-4">
                 <div>
-                    <h2>{% block page_title %}Dashboard{% endblock %}</h2>
-                    <p class="content-description">{% block page_description %}Real-time monitoring and management dashboard{% endblock %}</p>
+                    <h2 class="text-xl font-semibold text-gray-900">{% block page_title %}Dashboard{% endblock %}</h2>
+                    <p class="text-sm text-gray-500 mt-0.5">{% block page_description %}Real-time monitoring and management dashboard{% endblock %}</p>
                 </div>
-                <div class="header-actions">
+                <div class="flex space-x-3 items-center">
                     {% block header_actions %}{% endblock %}
                 </div>
             </div>
-            {% endif %}
 
-            <!-- Messages -->
             {% if messages %}
-            <div class="messages">
+            <div class="mb-6">
                 {% for message in messages %}
-                <div class="alert alert-{% if message.tags == 'error' %}error{% else %}success{% endif %}">
+                <div class="p-3 rounded-lg text-sm border {% if message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-green-50 text-green-700 border-green-200{% endif %} mb-2">
                     {{ message }}
                 </div>
                 {% endfor %}
             </div>
             {% endif %}
 
-            <!-- Page Content -->
             {% block content %}
             {% endblock %}
         </main>
     </div>
+    
+   
+    {% endif %}
 
     <script>
-        // Simple JavaScript for interactive elements
+        // Auto-hide messages after 5 seconds
         document.addEventListener('DOMContentLoaded', function() {
-            // Add active class to current page in sidebar
-            const currentPath = window.location.pathname;
-            const navLinks = document.querySelectorAll('.sidebar-nav a');
-            
-            navLinks.forEach(link => {
-                if (link.getAttribute('href') === currentPath) {
-                    link.classList.add('active');
-                }
-            });
-
-            // Auto-hide messages after 5 seconds
             const messages = document.querySelectorAll('.alert');
             messages.forEach(message => {
                 setTimeout(() => {
@@ -126,7 +200,6 @@
             });
         });
     </script>
-
     {% block extra_js %}{% endblock %}
 </body>
 </html>
