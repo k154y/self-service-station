@@ -1,32 +1,59 @@
 {% extends 'base.html' %}
 
+{% block page_title %}Pump Monitoring{% endblock %}
+{% block page_description %}Real-time pump status and control.{% endblock %}
+
 {% block content %}
-<div class="container">
-    <h2>Pump Management</h2>
-    
-    <div class="header-actions">
-        <a href="{% url 'pump_create' %}" class="btn btn-primary">Add New Pump</a>
+
+<div class="space-y-6">
+
+    {# --- Status Overview Cards (Based on image_c17b5e.png) --- #}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {% include 'pump/status_card.html' with title='Active' count=active_count color='text-green-600' %}
+        {% include 'pump/status_card.html' with title='Maintenance' count=maintenance_count color='text-yellow-600' %}
+        {% include 'pump/status_card.html' with title='Offline' count=offline_count color='text-red-600' %}
     </div>
 
-    <div class="pumps-grid">
+    {# --- Pump List --- #}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {% for pump in pumps %}
-        <div class="pump-card {{ pump.status }}">
-            <h4>Pump {{ pump.pump_number }}</h4>
-            <p><strong>Station:</strong> {{ pump.station.name }}</p>
-            <p><strong>Fuel Type:</strong> {{ pump.fuel_type }}</p>
-            <p><strong>Status:</strong> 
-                <span class="status-badge {{ pump.status }}">{{ pump.status|title }}</span>
-            </p>
+        <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100 relative">
             
-            <div class="actions">
-                <a href="{% url 'pump_status_update' pump.pump_id %}" class="btn btn-sm btn-warning">Update Status</a>
-                <a href="{% url 'pump_update' pump.pump_id %}" class="btn btn-sm btn-secondary">Edit</a>
-                <a href="{% url 'pump_delete' pump.pump_id %}" class="btn btn-sm btn-danger">Delete</a>
-            </div>
+            {# Edit Button #}
+            <a href="{% url 'pump_status_update' pump_id=pump.pump_id %}" class="absolute top-4 right-4 p-2 text-gray-400 hover:text-brand-blue transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 18.07a4.99 4.99 0 0 1-1.285.385l-1.928.64a.5.5 0 0 1-.6.6l.64-1.928a4.99 4.99 0 0 1 .385-1.285L16.862 4.487Z" />
+                </svg>
+            </a>
+
+            <h3 class="text-xl font-bold text-gray-900 mb-4">Pump {{ pump.pump_number }}</h3>
+            
+            <dl class="text-sm space-y-2">
+                <div>
+                    <dt class="text-xs font-medium text-gray-500 uppercase">Status</dt>
+                    <dd class="mt-1">
+                        <span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium 
+                            {% if pump.status == 'active' %}bg-green-100 text-green-800{% elif pump.status == 'offline' %}bg-red-100 text-red-800{% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                            {{ pump.get_status_display }}
+                        </span>
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-medium text-gray-500 uppercase">Fuel Type</dt>
+                    <dd class="mt-1 text-gray-800">{{ pump.fuel_type }}</dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-medium text-gray-500 uppercase">Location</dt>
+                    <dd class="mt-1 text-gray-800">{{ pump.station.name }}</dd>
+                </div>
+            </dl>
         </div>
         {% empty %}
-        <p>No pumps found.</p>
+        <div class="col-span-full p-6 text-center text-gray-500 bg-white rounded-xl shadow-md">
+            <p>No pump records found for your assigned stations/companies.</p>
+        </div>
         {% endfor %}
     </div>
 </div>
+
 {% endblock %}

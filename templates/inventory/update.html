@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Update Inventory{% endblock %}
+{% block page_description %}Adjust stock level, price, and minimum threshold for a fuel type.{% endblock %}
+
+{% block content %}
+
+<div class="max-w-xl mx-auto">
+    <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+        
+        <h2 class="text-2xl font-bold text-gray-900 mb-2">
+            Update Inventory: {{ inventory.fuel_type }}
+        </h2>
+        <p class="text-gray-600 mb-6">
+            Station: <span class="font-semibold">{{ inventory.station_id.name }}</span> (Capacity: {{ inventory.capacity|floatformat:0 }} L)
+        </p>
+
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="space-y-4">
+                
+                {# Field: Current Level (Liters) #}
+                <div class="relative">
+                    <label for="{{ form.quantity.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                        {{ form.quantity.label }}
+                    </label>
+                    <div class="mt-1">
+                        {{ form.quantity }}
+                        {% if form.quantity.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.quantity.errors.0 }}</p>
+                        {% endif %}
+                        <span class="absolute right-3 top-9 text-gray-500 pointer-events-none">L</span>
+                    </div>
+                </div>
+
+                {# Field: Price per liter (RWF) #}
+                <div class="relative">
+                    <label for="{{ form.unit_price.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                        {{ form.unit_price.label }}
+                    </label>
+                    <div class="mt-1">
+                        {{ form.unit_price }}
+                        {% if form.unit_price.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.unit_price.errors.0 }}</p>
+                        {% endif %}
+                        <span class="absolute right-3 top-9 text-gray-500 pointer-events-none">RWF</span>
+                    </div>
+                </div>
+
+                {# Field: Minimum Threshold (liters) #}
+                <div class="relative">
+                    <label for="{{ form.min_threshold.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                        {{ form.min_threshold.label }}
+                    </label>
+                    <div class="mt-1">
+                        {{ form.min_threshold }}
+                        {% if form.min_threshold.errors %}
+                            <p class="mt-1 text-sm text-red-600">{{ form.min_threshold.errors.0 }}</p>
+                        {% endif %}
+                        <span class="absolute right-3 top-9 text-gray-500 pointer-events-none">L</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="mt-6">
+                <button type="submit" class="w-full py-3 px-4 bg-brand-blue text-white font-semibold rounded-lg shadow-md hover:bg-brand-blue/90 transition-colors">
+                    Update Inventory
+                </button>
+            </div>
+            
+            <div class="mt-4 text-center">
+                <a href="{% url 'inventory_list' %}" class="text-sm text-gray-500 hover:text-gray-700">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

@@ -3,8 +3,11 @@ from django.urls import reverse_lazy
 from django.shortcuts import render, redirect,get_object_or_404
 from django.contrib import messages
 from django.db.models import Q, Sum
+from django.contrib.auth.mixins import UserPassesTestMixin
 from django.utils import timezone
 from .models import *
+from django.http import HttpResponseForbidden,JsonResponse
+from django.contrib.auth.decorators import user_passes_test
 
 # AUTHENTICATION VIEWS 
 def landing_page(request):
@@ -135,19 +138,30 @@ def dashboard(request):
 
 #  HELPER FUNCTIONS 
 def get_user_stations(user_id, user_role):
-    """Helper function to get stations based on user role"""
+    """
+    Returns a QuerySet of Station objects the user has access to.
+    """
+    if not user_id:
+        return Station.objects.none()
+
     try:
         user = User.objects.get(user_id=user_id)
-        
-        if user_role == 'admin':
-            return Station.objects.all()
-        elif user_role == 'owner':
-            return Station.objects.filter(company_id__owner=user)
-        elif user_role == 'manager':
-            return Station.objects.filter(manager_id=user)
-        return Station.objects.none()
     except User.DoesNotExist:
         return Station.objects.none()
+
+    if user_role == 'Admin':
+        # Admin sees all stations across all companies
+        return Station.objects.all()
+
+    elif user_role == 'Owner':
+        # Owner sees stations associated with companies they own
+        return Station.objects.filter(company_id__owner=user)
+
+    elif user_role == 'Manager':
+        # Manager sees stations they are assigned to manage
+        return Station.objects.filter(manager_id=user)
+
+    return Station.objects.none()
 
 # USER CRUD (Class-Based Views) 
 class UserListView(ListView):
@@ -350,6 +364,91 @@ class InventoryUpdateView(UpdateView):
     success_url = reverse_lazy('inventory_list')
     pk_url_kwarg = 'inventory_id'
     
+    def form_valid(self, form):
+        messages.success(self.request, 'Inventory updated successfully!')
+        return super().form_valid(form)
+
+class InventoryAccessMixin(UserPassesTestMixin):
+    """Ensures the user is logged in before accessing inventory pages."""
+    def test_func(self):
+        return self.request.session.get('user_id') and self.request.session.get('role')
+
+    def handle_no_permission(self):
+        if not self.request.session.get('user_id'):
+            return redirect(reverse_lazy('landing_page')) # Redirect to login if not logged in
+        return HttpResponseForbidden("You do not have permission to view this page.")
+
+# ========== INVENTORY CRUD ==========
+
+class InventoryListView(InventoryAccessMixin, ListView):
+    model = Inventory
+    template_name = "inventory/list.html"
+    context_object_name = "inventory_list"
+
+    def get_queryset(self):
+        user_id = self.request.session.get('user_id')
+        user_role = self.request.session.get('role')
+        stations = get_user_stations(user_id, user_role)
+        inventory = Inventory.objects.filter(station_id__in=stations)
+        
+        # Calculate percentages and status for display
+        for item in inventory:
+            if item.capacity and item.capacity > 0:
+                # *** THIS IS THE KEY CALCULATION ***
+                item.percentage = (item.quantity / item.capacity) * 100 
+            else:
+                item.percentage = 0
+            
+            # ... status calculation ...
+            
+        return inventory
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user_role = self.request.session.get('role')
+        
+        # Pass a flag to control the visibility of the "Edit" button in the template
+        # Only Admin and Owner can edit, Managers can only view.
+        context['can_edit'] = user_role in ['Admin', 'Owner']
+        context['user_role'] = user_role
+        return context
+
+
+class InventoryUpdateView(InventoryAccessMixin, UpdateView):
+    model = Inventory
+    template_name = "inventory/inventory_update.html" # Renamed to match my previous suggestion
+    fields = ["quantity", "unit_price", "min_threshold"]
+    success_url = reverse_lazy('inventory_list')
+    pk_url_kwarg = 'inventory_id'
+    
+    # Enforce role-based access for UPDATING
+    def test_func(self):
+        # 1. Check base access (logged in)
+        if not super().test_func():
+            return False
+        
+        user_role = self.request.session.get('role')
+        user_id = self.request.session.get('user_id')
+        
+        # Admin can update everything
+        if user_role == 'Admin':
+            return True
+            
+        # Managers are not allowed to update
+        if user_role == 'Manager':
+            return False 
+        
+        # Owner check: Must own the company associated with the station
+        if user_role == 'Owner':
+            inventory = self.get_object() # Fetches the Inventory item being updated
+            try:
+                current_user = User.objects.get(pk=user_id)
+                # Check if the current user is the owner of the company associated with the station
+                return inventory.station_id.company_id.owner == current_user
+            except User.DoesNotExist:
+                return False
+        
+        return False
+
     def form_valid(self, form):
         messages.success(self.request, 'Inventory updated successfully!')
         return super().form_valid(form)

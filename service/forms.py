@@ -30,6 +30,29 @@ class InventoryForm(forms.ModelForm):
         model = Inventory
         fields = ['station_id', 'fuel_type', 'quantity', 'capacity', 'min_threshold', 'unit_price']
 
+
+class InventoryUpdateForm(forms.ModelForm):
+   
+    
+    quantity = forms.FloatField(
+        label="Current Level (Liters)",
+        widget=forms.NumberInput(attrs={'step': '1', 'min': '0', 'class': 'form-input'})
+    )
+    unit_price = forms.DecimalField(
+        label="Price per liter (RWF)",
+        max_digits=10, 
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'step': '0.01', 'min': '0', 'class': 'form-input'})
+    )
+    min_threshold = forms.FloatField(
+        label="Minimum Threshold (liters)",
+        widget=forms.NumberInput(attrs={'step': '1', 'min': '0', 'class': 'form-input'})
+    )
+
+    class Meta:
+        model = Inventory
+        fields = ['quantity', 'unit_price', 'min_threshold']
+
 class TransactionForm(forms.ModelForm):
     class Meta:
         model = Transaction
