@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Update Pump Status{% endblock %}
+{% block page_description %}Change the operational status of a pump.{% endblock %}
+
+{% block content %}
+
+<div class="max-w-md mx-auto">
+    <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+        
+        <h2 class="text-2xl font-bold text-gray-900 mb-1">Update Pump Status</h2>
+        <p class="text-gray-600 mb-6">Pump: <span class="font-semibold">{{ pump.pump_number }}</span> ({{ pump.station.name }})</p>
+
+        <form method="post" action="{% url 'pump_status_update' pump_id=pump.pump_id %}">
+            {% csrf_token %}
+
+            <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Pump status</label>
+            <select name="status" id="status" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-brand-blue focus:border-brand-blue mb-4">
+                {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if value == pump.status %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            
+            <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6" role="alert">
+                <p class="font-bold">Note:</p>
+                <p class="text-sm">Changing pump status will affect customer access and transactions.</p>
+            </div>
+
+            <button type="submit" class="w-full py-3 px-4 bg-black text-white font-semibold rounded-lg shadow-md hover:bg-gray-800 transition-colors">
+                Update pump status
+            </button>
+            
+            <div class="mt-4 text-center">
+                <a href="{% url 'pump_list' %}" class="text-sm text-gray-500 hover:text-gray-700">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

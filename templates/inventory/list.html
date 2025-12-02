@@ -89,7 +89,7 @@
     {% empty %}
     <div class="p-6 text-center text-gray-500 bg-white rounded-xl shadow-md">
         <p>No inventory records found for your assigned stations/companies.</p>
-        {% if user_role == 'Admin' %}
+        {% if user_role == 'admin' %}
             <p class="mt-2 text-sm">As an Admin, you should see all inventory. Check that inventory records exist in the database.</p>
         {% endif %}
     </div>
