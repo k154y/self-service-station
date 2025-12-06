@@ -9,7 +9,7 @@ class User(models.Model):
     username = models.CharField(max_length=50, unique=True)
     full_name = models.CharField(max_length=100)
     password=models.CharField(max_length=12)
-    email = models.EmailField(blank=True, null=True)
+    email = models.EmailField(blank=True, null=True,unique=True)
     ROLE_CHOICES = [
         ('admin', 'Admin'),
         ('owner', 'Owner'),
@@ -69,7 +69,7 @@ class Pump(models.Model):
     
 
     class Meta:
-        unique_together = ('station_id', 'pump_number')
+        unique_together = ('station', 'pump_number')
 
     def __str__(self):
         return f"Pump {self.pump_number} - {self.station.name}"
@@ -83,6 +83,27 @@ class SystemSetting(models.Model):
     fuel_type = models.CharField(max_length=50)
     price_per_liter = models.DecimalField(max_digits=10, decimal_places=2)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def update_prices(self, user_role, company_id=None):
+        """Updates prices in SystemSetting and relevant Inventory models."""
+        
+        # 1. Update the SystemSetting (Global/Company Price)
+        self.save() 
+        
+        # 2. Update Inventory prices (Synchronize)
+        
+        # Admin: Updates Inventory for ALL stations/companies with this fuel_type
+        if user_role == 'admin':
+            Inventory.objects.filter(fuel_type=self.fuel_type).update(unit_price=self.price_per_liter)
+            
+        # Owner: Updates Inventory only for stations under their company(ies)
+        elif user_role == 'owner' and company_id:
+            Inventory.objects.filter(
+                fuel_type=self.fuel_type, 
+                station_id__company_id=company_id
+            ).update(unit_price=self.price_per_liter)
+            
+        # Manager/Other: No price setting privilege
 
     def __str__(self):
         return f"{self.fuel_type}"

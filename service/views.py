@@ -1,13 +1,15 @@
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView,TemplateView
 from django.urls import reverse_lazy
 from django.shortcuts import render, redirect,get_object_or_404
 from django.contrib import messages
 from django.db.models import Q, Sum
-from django.contrib.auth.mixins import UserPassesTestMixin
+from django.contrib.auth.mixins import UserPassesTestMixin,LoginRequiredMixin
 from django.utils import timezone
+from datetime import timedelta
 from .models import *
 from django.http import HttpResponseForbidden,JsonResponse
 from django.contrib.auth.decorators import user_passes_test
+from django.core.paginator import Paginator
 
 # AUTHENTICATION VIEWS 
 def landing_page(request):
@@ -32,6 +34,33 @@ def landing_page(request):
     
     return render(request, 'landing.html')
 
+# def signup_page(request):
+#     """Sign up page"""
+#     if request.method == 'POST':
+#         username = request.POST.get('username')
+#         full_name = request.POST.get('full_name')
+#         email = request.POST.get('email')
+#         password = request.POST.get('password')
+#         role = request.POST.get('role', 'manager')
+        
+#         if User.objects.filter(username=username).exists():
+#             messages.error(request, 'Username already exists')
+#         elif User.objects.filter(email=email).exists():
+#             messages.error(request, 'Email already exists')
+#         else:
+#             user = User.objects.create(
+#                 username=username,
+#                 full_name=full_name,
+#                 email=email,
+#                 password=password,
+#                 role=role
+#             )
+#             messages.success(request, 'Account created successfully! Please login.')
+#             return redirect('landing_page')
+    
+#     return render(request, 'signup.html')
+from django.contrib.auth.hashers import make_password
+
 def signup_page(request):
     """Sign up page"""
     if request.method == 'POST':
@@ -40,23 +69,30 @@ def signup_page(request):
         email = request.POST.get('email')
         password = request.POST.get('password')
         role = request.POST.get('role', 'manager')
-        
+
+        # Check if username already exists
         if User.objects.filter(username=username).exists():
             messages.error(request, 'Username already exists')
+
+        # Check if email already exists
         elif User.objects.filter(email=email).exists():
             messages.error(request, 'Email already exists')
+
         else:
+            # Create a user with a hashed password
             user = User.objects.create(
                 username=username,
                 full_name=full_name,
                 email=email,
-                password=password,
+                password=make_password(password),   # <-- HASHED PASSWORD
                 role=role
             )
+
             messages.success(request, 'Account created successfully! Please login.')
             return redirect('landing_page')
-    
+
     return render(request, 'signup.html')
+
 
 def forgot_password(request):
     """Forgot password page"""
@@ -169,15 +205,73 @@ class UserListView(ListView):
     template_name = "users/list.html"
     context_object_name = "users"
 
-class UserCreateView(CreateView):
+# class UserCreateView(CreateView):
+#     model = User
+#     template_name = "users/form.html"
+#     fields = ["username", "full_name", "email", "password", "role"]
+#     success_url = reverse_lazy('user_list')
+    
+#     def form_valid(self, form):
+#         messages.success(self.request, 'User created successfully!')
+#         return super().form_valid(form)
+
+
+class UserCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     model = User
     template_name = "users/form.html"
     fields = ["username", "full_name", "email", "password", "role"]
     success_url = reverse_lazy('user_list')
-    
+
+    # WHO CAN ACCESS THIS PAGE?
+    def test_func(self):
+        user = self.request.user
+
+        if user.role == "admin":
+            return True
+        if user.role == "owner":
+            return True
+        # manager or normal user = forbidden
+        return False
+
+    # FILTER ROLES THEY CAN CHOOSE
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+
+        current_user = self.request.user
+
+        if current_user.role == "admin":
+            # admin can choose any role
+            pass
+
+        elif current_user.role == "owner":
+            # owner can ONLY create manager
+            form.fields["role"].choices = [
+                ('manager', 'Manager'),
+            ]
+
+        return form
+
+    # HANDLE USER CREATION AND PASSWORD HASHING
     def form_valid(self, form):
-        messages.success(self.request, 'User created successfully!')
-        return super().form_valid(form)
+        current_user = self.request.user
+        selected_role = form.cleaned_data['role']
+
+        # PERMISSION CHECK FOR ROLE ASSIGNMENT
+        if current_user.role == "owner" and selected_role != "manager":
+            messages.error(self.request, "You are only allowed to create MANAGER users.")
+            return redirect("user_list")
+
+        if current_user.role == "manager":
+            messages.error(self.request, "You are not allowed to create users.")
+            return redirect("user_list")
+
+        user = form.save(commit=False)
+        user.set_password(form.cleaned_data['password'])
+        user.save()
+
+        messages.success(self.request, "User created successfully!")
+        return redirect(self.success_url)
+
 
 class UserUpdateView(UpdateView):
     model = User
@@ -454,52 +548,99 @@ class InventoryUpdateView(InventoryAccessMixin, UpdateView):
         return super().form_valid(form)
 
 # ========== TRANSACTION CRUD ==========
+
 class TransactionListView(ListView):
     model = Transaction
     template_name = "transactions/list.html"
     context_object_name = "transactions"
-    
+    paginate_by = 15  # Set default pagination
+
     def get_queryset(self):
         user_id = self.request.session.get('user_id')
         user_role = self.request.session.get('role')
-        stations = get_user_stations(user_id, user_role)
-        transactions = Transaction.objects.filter(station_id__in=stations)
         
-        # Search functionality
+        # 1. Base Queryset (Role-Based Filtering)
+        # Reusing the existing user station logic for filtering
+        authorized_stations = get_user_stations(user_id, user_role)
+        queryset = Transaction.objects.filter(station_id__in=authorized_stations).select_related('station_id', 'pump_id')
+
+        # 2. Applying Advanced Filters from GET parameters
+        
+        # --- Time Filter (duration) ---
+        duration = self.request.GET.get('duration', 'all')
+        if duration == '24hrs':
+            time_cutoff = timezone.now() - timedelta(hours=24)
+            queryset = queryset.filter(transaction_time__gte=time_cutoff)
+        elif duration == 'week':
+            time_cutoff = timezone.now() - timedelta(weeks=1)
+            queryset = queryset.filter(transaction_time__gte=time_cutoff)
+        elif duration == 'month':
+            time_cutoff = timezone.now() - timedelta(days=30)
+            queryset = queryset.filter(transaction_time__gte=time_cutoff)
+        # 'all' (default) needs no filter
+        
+        # --- Payment Method Filter ---
+        payment_method = self.request.GET.get('payment_method')
+        if payment_method and payment_method != 'all':
+            queryset = queryset.filter(payment_method=payment_method)
+
+        # --- Station Filter (Admin/Owner Specific) ---
+        # Note: Manager is already restricted by 'authorized_stations'
+        selected_station_id = self.request.GET.get('station_id')
+        if user_role in ['Admin', 'Owner'] and selected_station_id and selected_station_id != 'all':
+            # This filter is already somewhat redundant if authorized_stations is used, 
+            # but it is necessary if the user explicitly filters down the list.
+            queryset = queryset.filter(station_id=selected_station_id)
+
+        # --- Search Filter (Car Plate, Fuel Type, Payment Method ID) ---
         search_query = self.request.GET.get('search', '')
         if search_query:
-            transactions = transactions.filter(
+            queryset = queryset.filter(
                 Q(fuel_type__icontains=search_query) |
                 Q(payment_method__icontains=search_query) |
-                Q(car_plate__icontains=search_query)
+                Q(car_plate__icontains=search_query) |
+                Q(transaction_id__icontains=search_query) # Search by ID
             )
         
-        return transactions
-    
+        # Default ordering: most recent first
+        return queryset.order_by('-transaction_time')
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user_id = self.request.session.get('user_id')
         user_role = self.request.session.get('role')
-        stations = get_user_stations(user_id, user_role)
+        stations_for_stats = get_user_stations(user_id, user_role)
         
-        # Today's totals
+        # 1. Pass Filter Options and Current Selections
+        context['user_role'] = user_role
+        context['duration_options'] = [('all', 'All Time'), ('24hrs', 'Last 24 Hours'), ('week', 'Last Week'), ('month', 'Last Month')]
+        context['payment_methods'] = Transaction.PAYMENT_METHODS
+        
+        # Stations available for filtering (Only applicable for Admin/Owner in the template)
+        context['filterable_stations'] = Station.objects.filter(pk__in=[s.pk for s in stations_for_stats]).order_by('name')
+        
+        # Current filter values for dropdown persistence
+        context['current_duration'] = self.request.GET.get('duration', 'all')
+        context['current_payment_method'] = self.request.GET.get('payment_method', 'all')
+        context['current_station_id'] = self.request.GET.get('station_id', 'all')
+        context['search_query'] = self.request.GET.get('search', '')
+
+        # 2. Summary Totals (Totals are calculated BEFORE pagination, but AFTER role-based filtering)
+        all_transactions_for_role = self.model.objects.filter(station_id__in=stations_for_stats)
+        
         today = timezone.now().date()
-        today_totals = Transaction.objects.filter(
-            station_id__in=stations,
-            transaction_time__date=today
-        ).aggregate(
+        today_totals = all_transactions_for_role.filter(transaction_time__date=today).aggregate(
             total_revenue=Sum('total_price'),
-            total_transactions=Sum('quantity')
+            total_petrol_dispensed=Sum('quantity', filter=Q(fuel_type='Petrol')),
+            total_diesel_dispensed=Sum('quantity', filter=Q(fuel_type='Diesel')),
         )
         
-        context['search_query'] = self.request.GET.get('search', '')
-        context['total_transactions'] = context['transactions'].count()
         context['today_revenue'] = today_totals['total_revenue'] or 0
-        context['total_petrol'] = context['transactions'].filter(fuel_type='Petrol').aggregate(Sum('quantity'))['quantity__sum'] or 0
-        context['total_diesel'] = context['transactions'].filter(fuel_type='Diesel').aggregate(Sum('quantity'))['quantity__sum'] or 0
+        context['total_petrol_dispensed'] = today_totals['total_petrol_dispensed'] or 0
+        context['total_diesel_dispensed'] = today_totals['total_diesel_dispensed'] or 0
+        context['total_transactions_count'] = all_transactions_for_role.count() # Count of all available transactions (pre-filter)
         
         return context
-
 class TransactionCreateView(CreateView):
     model = Transaction
     template_name = "transactions/form.html"
@@ -532,16 +673,93 @@ class TransactionCreateView(CreateView):
         return context
 
 # ========== ALERT CRUD ==========
+
+
 class AlertListView(ListView):
     model = Alert
     template_name = "alerts/list.html"
     context_object_name = "alerts"
-    
+    paginate_by = 20 # Standard pagination size
+
     def get_queryset(self):
         user_id = self.request.session.get('user_id')
         user_role = self.request.session.get('role')
-        stations = get_user_stations(user_id, user_role)
-        return Alert.objects.filter(station__in=stations)
+        
+        # 1. Base Queryset (Role-Based Access)
+        # Filters alerts down to stations the user is authorized to see
+        authorized_stations = get_user_stations(user_id, user_role)
+        queryset = Alert.objects.filter(station__in=authorized_stations).select_related('station', 'pump_id', 'inventory_id')
+
+        # 2. Applying Filters from GET parameters
+        
+        # --- Status Filter ---
+        status_filter = self.request.GET.get('status', 'pending') # Default to pending
+        if status_filter != 'all':
+            queryset = queryset.filter(status=status_filter)
+        
+        # --- Type Filter ---
+        type_filter = self.request.GET.get('type')
+        if type_filter and type_filter != 'all':
+            queryset = queryset.filter(type=type_filter)
+            
+        # --- Company Filter (Admin only) ---
+        selected_company_id = self.request.GET.get('company_id')
+        if user_role == 'admin' and selected_company_id and selected_company_id != 'all':
+            queryset = queryset.filter(station__company_id=selected_company_id)
+            
+        # --- Station Filter (Admin/Owner control) ---
+        selected_station_id = self.request.GET.get('station_id')
+        if user_role in ['admin', 'owner'] and selected_station_id and selected_station_id != 'all':
+            queryset = queryset.filter(station__pk=selected_station_id)
+
+        # Default ordering: most recent first
+        return queryset.order_by('-created_at')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user_id = self.request.session.get('user_id')
+        user_role = self.request.session.get('role')
+        
+        # Determine all stations the user *could* filter by (used for summary stats and dropdowns)
+        authorized_stations = get_user_stations(user_id, user_role)
+        
+        context['user_role'] = user_role
+        
+        # Filter Options
+        context['status_options'] = Alert.status_choices
+        context['type_options'] = Alert.type_choices
+        
+        # Get companies/stations for dropdown filtering
+        if user_role == 'admin':
+             # Admin sees all companies
+            context['filterable_companies'] = Company.objects.all().order_by('name')
+            context['filterable_stations'] = Station.objects.all().order_by('name')
+        elif user_role == 'owner':
+            # Owner sees their companies' stations
+            try:
+                owner_user = get_object_or_404(User, user_id=user_id)
+                owner_companies = Company.objects.filter(owner=owner_user)
+                context['filterable_companies'] = owner_companies
+                context['filterable_stations'] = Station.objects.filter(company_id__in=owner_companies).order_by('name')
+            except:
+                context['filterable_companies'] = Company.objects.none()
+                context['filterable_stations'] = Station.objects.none()
+        else: # Manager sees only their assigned stations (covered by base queryset filtering)
+             context['filterable_stations'] = Station.objects.filter(pk__in=[s.pk for s in authorized_stations]).order_by('name')
+        
+        # Current Filter Values for dropdown persistence
+        context['current_status'] = self.request.GET.get('status', 'pending')
+        context['current_type'] = self.request.GET.get('type', 'all')
+        context['current_company_id'] = self.request.GET.get('company_id', 'all')
+        context['current_station_id'] = self.request.GET.get('station_id', 'all')
+        
+        # Counts for status cards (calculated over all authorized alerts)
+        all_alerts_for_role = Alert.objects.filter(station__in=authorized_stations)
+        context['pending_count'] = all_alerts_for_role.filter(status='pending').count()
+        context['resolved_count'] = all_alerts_for_role.filter(status='resolved').count()
+        context['total_alerts'] = all_alerts_for_role.count()
+
+        return context
 
 class AlertUpdateView(UpdateView):
     model = Alert
@@ -590,3 +808,82 @@ class SystemSettingDeleteView(DeleteView):
     def delete(self, request, *args, **kwargs):
         messages.success(self.request, 'Fuel type deleted successfully!')
         return super().delete(request, *args, **kwargs)
+    from django.views.generic import TemplateView
+from django.shortcuts import redirect
+from django.urls import reverse_lazy
+from django.db import transaction
+from django.contrib import messages
+from .models import SystemSetting, Company, Station, User, Inventory
+
+class SettingsView(TemplateView):
+    template_name = "settings/list.html"
+    
+    def get_user_data(self):
+        """Helper to get user role and data for context."""
+        user_id = self.request.session.get('user_id')
+        user_role = self.request.session.get('role')
+        user = None
+        
+        if user_id:
+            try:
+                # Assuming User model is what you provided
+                user = User.objects.get(user_id=user_id) 
+            except User.DoesNotExist:
+                pass
+                
+        return user, user_role
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user, user_role = self.get_user_data()
+
+        context['user_role'] = user_role
+        context['fuel_settings'] = SystemSetting.objects.all().order_by('fuel_type')
+        
+        # Filtering for Admin/Owner access panels
+        if user_role == 'admin':
+            context['all_companies'] = Company.objects.all().order_by('name')
+        elif user_role == 'owner':
+            # Get the company(ies) owned by this user
+            context['owner_companies'] = Company.objects.filter(owner=user).order_by('name')
+
+        return context
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        user, user_role = self.get_user_data()
+        action = request.POST.get('action')
+
+        if action == 'update_pricing':
+            fuel_type = request.POST.get('fuel_type')
+            new_price = request.POST.get('price_per_liter')
+            
+            # --- Role-Based Price Update Logic ---
+            if user_role == 'admin':
+                # Admin can set price globally for a fuel type
+                try:
+                    setting = SystemSetting.objects.get(fuel_type=fuel_type)
+                    setting.price_per_liter = new_price
+                    setting.update_prices(user_role) # Global update
+                    messages.success(request, f'Global price for {fuel_type} updated to {new_price} RWF.')
+                except SystemSetting.DoesNotExist:
+                    messages.error(request, 'Fuel type not found.')
+                    
+            elif user_role == 'owner':
+                # Owner can set price for their specific company/stations
+                company_id = request.POST.get('company_id')
+                try:
+                    # 1. Update the SystemSetting price (acts as the master price)
+                    setting = SystemSetting.objects.get(fuel_type=fuel_type)
+                    setting.price_per_liter = new_price
+                    setting.update_prices(user_role, company_id) # Company-specific Inventory update
+                    messages.success(request, f'Company price for {fuel_type} updated to {new_price} RWF.')
+                except SystemSetting.DoesNotExist:
+                    messages.error(request, 'Fuel type not found.')
+                    
+            else:
+                messages.error(request, 'You do not have permission to change pricing.')
+
+        # Future actions like 'add_company', 'add_manager', 'add_station' would go here...
+
+        return redirect(reverse_lazy('settings_list')) # Redirect back to the settings page

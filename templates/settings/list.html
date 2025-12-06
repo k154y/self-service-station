@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block page_title %}System Settings{% endblock %}
+{% block page_description %}Manage system configuration and user privileges.{% endblock %}
+
+{% block content %}
+
+<div class="space-y-6">
+
+    <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+        
+        <h3 class="text-xl font-semibold mb-4 text-gray-800">Global Pricing</h3>
+        
+        <form method="POST" class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 items-end" action="{% url 'settings_list' %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_pricing">
+
+            {# Fuel Type Select #}
+            <div class="w-full sm:w-1/4">
+                <label for="fuel-type" class="block text-sm font-medium text-gray-700">Fuel type</label>
+                <select id="fuel-type" name="fuel_type" required class="mt-1 block w-full border border-gray-300 rounded-lg focus:ring-brand-blue focus:border-brand-blue">
+                    <option value="" disabled selected>Select Fuel</option>
+                    {% for setting in fuel_settings %}
+                        <option value="{{ setting.fuel_type }}">{{ setting.fuel_type }} (Current: {{ setting.price_per_liter }} RWF)</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            {# Company Filter (Only for Owner) #}
+            {% if user_role == 'owner' %}
+            <div class="w-full sm:w-1/4">
+                <label for="company-id" class="block text-sm font-medium text-gray-700">Company</label>
+                <select id="company-id" name="company_id" required class="mt-1 block w-full border border-gray-300 rounded-lg focus:ring-brand-blue focus:border-brand-blue">
+                    <option value="" disabled selected>Select Company</option>
+                    {% for company in owner_companies %}
+                        <option value="{{ company.pk }}">{{ company.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            {# Price Input #}
+            <div class="w-full sm:w-1/4">
+                <label for="price-input" class="block text-sm font-medium text-gray-700">Price per liter (RWF)</label>
+                <input type="number" step="0.01" id="price-input" name="price_per_liter" required class="mt-1 block w-full border border-gray-300 rounded-lg focus:ring-brand-blue focus:border-brand-blue" placeholder="e.g., 1250">
+            </div>
+
+            <button type="submit" class="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+                SET
+            </button>
+        </form>
+        
+        <p class="text-xs text-gray-500 mt-2">
+            **Note**: Updating this price will automatically update the **Unit Price** in the **Inventory** for the relevant stations/companies.
+        </p>
+    </div>
+
+    {# --- User/Company/Station Management Panel --- #}
+    <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+        <h3 class="text-xl font-semibold mb-4 text-gray-800">User & Company Management</h3>
+
+        {# Admin Panel (All Privileges) #}
+        {% if user_role == 'admin' %}
+        <div class="space-y-6">
+            <div class="flex items-center space-x-4 p-4 border rounded-xl bg-gray-50">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 text-gray-400">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 013 0m-3 0a1.5 1.5 0 003 0M3.75 18H7.5" />
+                </svg>
+                <div>
+                    <p class="font-medium text-lg text-gray-800">Admin Level Settings</p>
+                    <p class="text-sm text-gray-500">Full system control: Users, Companies, Stations.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button onclick="openForm('add-user-modal')" class="flex flex-col items-center justify-center p-4 border border-gray-300 rounded-xl hover:bg-gray-100 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-blue-600 mb-2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7.5v3m0 0v3m0-3h-3m3 0h3M17.25 17.25H6.75a2.25 2.25 0 01-2.25-2.25V6.75a2.25 2.25 0 012.25-2.25h10.5a2.25 2.25 0 012.25 2.25v10.5z" />
+                    </svg>
+                    <span class="text-sm font-medium">Add New User</span>
+                </button>
+                <button onclick="openForm('add-company-modal')" class="flex flex-col items-center justify-center p-4 border border-gray-300 rounded-xl hover:bg-gray-100 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-green-600 mb-2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M12 10.5h.008v.008H12z" />
+                    </svg>
+                    <span class="text-sm font-medium">Add New Company</span>
+                </button>
+                <button onclick="openForm('add-station-modal')" class="flex flex-col items-center justify-center p-4 border border-gray-300 rounded-xl hover:bg-gray-100 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-red-600 mb-2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21L.75 19.5" />
+                        </svg>
+                    <span class="text-sm font-medium">Add New Station</span>
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Owner Panel (Limited Privileges) #}
+        {% if user_role == 'owner' %}
+        <div class="space-y-6">
+            <div class="flex items-center space-x-4 p-4 border rounded-xl bg-gray-50">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 text-gray-400">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M18 7.5v3m0 0v3m0-3h-3m3 0h3M17.25 17.25H6.75a2.25 2.25 0 01-2.25-2.25V6.75a2.25 2.25 0 012.25-2.25h10.5a2.25 2.25 0 012.25 2.25v10.5z" />
+                </svg>
+                <div>
+                    <p class="font-medium text-lg text-gray-800">Owner Level Settings</p>
+                    <p class="text-sm text-gray-500">Manage managers and add new stations for your companies.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button onclick="openForm('add-manager-modal')" class="flex flex-col items-center justify-center p-4 border border-gray-300 rounded-xl hover:bg-gray-100 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-blue-600 mb-2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.5v-2.25m-4.5-2.25h3m7.5-3v2.25m-3 0h-3m-3 0v-2.25m-4.5-2.25h3m-7.5-3v2.25m-3 0h-3m3 0v-2.25" />
+                    </svg>
+                    <span class="text-sm font-medium">Add New Manager</span>
+                </button>
+                <button onclick="openForm('add-station-modal')" class="flex flex-col items-center justify-center p-4 border border-gray-300 rounded-xl hover:bg-gray-100 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-red-600 mb-2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21L.75 19.5" />
+                        </svg>
+                    <span class="text-sm font-medium">Add New Station</span>
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+{# --- MODAL PLACEHOLDERS (You would replace these with actual Django forms) --- #}
+
+{% include 'forms/add_user_modal.html' %} 
+{% include 'forms/add_company_modal.html' %} 
+{% include 'forms/add_station_modal.html' %} 
+{% include 'forms/add_manager_modal.html' %} 
+
+<script>
+    function openForm(modalId) {
+        // In a real implementation, you would use JavaScript to show the modal (e.g., Tailwind UI modal logic)
+        alert('Opening form for: ' + modalId); 
+        // Example: document.getElementById(modalId).classList.remove('hidden');
+    }
+</script>
+
+{% endblock %}

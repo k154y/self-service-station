@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+{% load humanize %} 
+
+{% block page_title %}System Alerts{% endblock %}
+{% block page_description %}Monitor inventory, pump, and security alerts across stations.{% endblock %}
+
+{% block content %}
+
+<div class="space-y-6">
+
+    {# --- Alerts Overview Cards --- #}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        
+        {# Card 1: Pending Alerts #}
+        {% include 'alerts/alert_card.html' with title='Pending Review' count=pending_count color='text-yellow-600' icon='bell' %}
+        
+        {# Card 2: Total Alerts #}
+        {% include 'alerts/alert_card.html' with title='Total Alerts' count=total_alerts color='text-gray-600' icon='list' %}
+        
+        {# Card 3: Resolved Alerts #}
+        {% include 'alerts/alert_card.html' with title='Resolved (All Time)' count=resolved_count color='text-green-600' icon='check' %}
+        
+    </div>
+
+    <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+        
+        <h3 class="text-xl font-semibold mb-4 text-gray-800">Alert Filter</h3>
+
+        {# --- Filtering Form --- #}
+        <form method="GET" class="mb-6 space-y-4 lg:space-y-0 lg:flex lg:space-x-4 items-end">
+            
+            <div class="flex space-x-4 flex-wrap">
+                {# Status Filter #}
+                <div class="w-full sm:w-auto">
+                    <label for="status-filter" class="block text-sm font-medium text-gray-700">Status</label>
+                    <select id="status-filter" name="status" class="mt-1 block w-full border border-gray-300 rounded-lg focus:ring-brand-blue focus:border-brand-blue">
+                        <option value="all" {% if current_status == 'all' %}selected{% endif %}>All Statuses</option>
+                        {% for value, label in status_options %}
+                            <option value="{{ value }}" {% if value == current_status %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                {# Type Filter #}
+                <div class="w-full sm:w-auto">
+                    <label for="type-filter" class="block text-sm font-medium text-gray-700">Alert Type</label>
+                    <select id="type-filter" name="type" class="mt-1 block w-full border border-gray-300 rounded-lg focus:ring-brand-blue focus:border-brand-blue">
+                        <option value="all" {% if current_type == 'all' %}selected{% endif %}>All Types</option>
+                        {% for value, label in type_options %}
+                            <option value="{{ value }}" {% if value == current_type %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                {# Company Filter (Admin Only) #}
+                {% if user_role == 'admin' %}
+                <div class="w-full sm:w-auto">
+                    <label for="company-filter" class="block text-sm font-medium text-gray-700">Company</label>
+                    <select id="company-filter" name="company_id" class="mt-1 block w-full border border-gray-300 rounded-lg focus:ring-brand-blue focus:border-brand-blue">
+                        <option value="all" {% if current_company_id == 'all' %}selected{% endif %}>All Companies</option>
+                        {% for company in filterable_companies %}
+                            <option value="{{ company.pk }}" {% if company.pk|stringformat:"i" == current_company_id %}selected{% endif %}>{{ company.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                {# Station Filter (Admin/Owner) #}
+                {% if user_role in 'admin|owner' %}
+                <div class="w-full sm:w-auto">
+                    <label for="station-filter" class="block text-sm font-medium text-gray-700">Station</label>
+                    <select id="station-filter" name="station_id" class="mt-1 block w-full border border-gray-300 rounded-lg focus:ring-brand-blue focus:border-brand-blue">
+                        <option value="all" {% if current_station_id == 'all' %}selected{% endif %}>All Stations</option>
+                        {% for station in filterable_stations %}
+                            <option value="{{ station.pk }}" {% if station.pk|stringformat:"i" == current_station_id %}selected{% endif %}>{{ station.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="px-4 py-2 bg-gray-500 text-white text-sm font-medium rounded-lg hover:bg-gray-600 transition-colors w-full lg:w-auto mt-4 lg:mt-0">
+                Apply Filters
+            </button>
+        </form>
+        
+        {# --- Alerts List Table --- #}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for alert in alerts %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                            {{ alert.created_at|date:"Y-m-d H:i" }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium 
+                                {% if alert.type == 'security' %}bg-red-100 text-red-800{% elif alert.type == 'inventory' %}bg-orange-100 text-orange-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                                {{ alert.get_type_display }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <p class="font-medium text-gray-800">{{ alert.station.name }}</p>
+                            {% if alert.pump_id %}
+                                <p class="text-xs text-gray-500">Pump: {{ alert.pump_id.pump_number }}</p>
+                            {% elif alert.inventory_id %}
+                                <p class="text-xs text-gray-500">Tank: {{ alert.inventory_id.fuel_type }}</p>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-800 max-w-xs" title="{{ alert.description }}">
+                            {{ alert.description|truncatechars:100 }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
+                            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium 
+                                {% if alert.status == 'pending' %}bg-yellow-100 text-yellow-800{% elif alert.status == 'resolved' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ alert.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            {% if alert.status == 'pending' %}
+                            <a href="{% url 'alert_update' alert_id=alert.alert_id %}" class="text-brand-blue hover:text-brand-blue/80">
+                                Review
+                            </a>
+                            {% else %}
+                            <span class="text-gray-400">View</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-10 text-center text-gray-500">
+                            No alerts found matching your criteria.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {# --- Pagination --- #}
+        {% if is_paginated %}
+        <nav class="pt-4 border-t border-gray-100 flex items-center justify-between">
+            <span class="text-sm text-gray-700">
+                Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} results
+            </span>
+            <div class="flex space-x-2">
+                {# Pagination Logic (reusing structure from Transaction List) #}
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                       class="px-3 py-1 text-sm rounded-lg border border-gray-300 hover:bg-gray-100">Previous</a>
+                {% endif %}
+                
+                {% for i in paginator.page_range %}
+                    {% if page_obj.number == i %}
+                        <span class="px-3 py-1 text-sm rounded-lg bg-brand-blue text-white font-semibold">{{ i }}</span>
+                    {% elif i > page_obj.number|add:'-3' and i < page_obj.number|add:'3' %}
+                        <a href="?page={{ i }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                           class="px-3 py-1 text-sm rounded-lg border border-gray-300 hover:bg-gray-100">{{ i }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                       class="px-3 py-1 text-sm rounded-lg border border-gray-300 hover:bg-gray-100">Next</a>
+                {% endif %}
+            </div>
+        </nav>
+        {% endif %}
+        
+    </div>
+</div>
+
+{% endblock %}

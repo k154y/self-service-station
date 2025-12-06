@@ -1,0 +1,18 @@
+<div id="add-company-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">Add New Company</h3>
+        <form method="POST" action="{% url 'add_company' %}">
+            {% csrf_token %}
+            <label for="company-name" class="block text-sm font-medium text-gray-700">Company Name</label>
+            <input type="text" id="company-name" name="name" required class="mt-1 block w-full border border-gray-300 rounded-lg">
+            
+            <label for="owner-user" class="block text-sm font-medium text-gray-700 mt-3">Owner (User)</label>
+            <input type="text" id="owner-user" name="owner_username" required class="mt-1 block w-full border border-gray-300 rounded-lg" placeholder="Enter owner's username">
+
+            <div class="mt-4 flex justify-end space-x-3">
+                <button type="button" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg" onclick="document.getElementById('add-company-modal').classList.add('hidden')">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Create Company</button>
+            </div>
+        </form>
+    </div>
+</div>

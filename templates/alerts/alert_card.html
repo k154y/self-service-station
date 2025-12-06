@@ -1,0 +1,27 @@
+<div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100 flex items-center justify-between">
+    <div>
+        <h3 class="text-md font-medium text-gray-500 mb-1">{{ title }}</h3>
+        <p class="text-4xl font-bold {{ color }}">
+            {{ count|intcomma }}
+        </p>
+    </div>
+    
+    <div class="p-3 rounded-full 
+        {% if icon == 'bell' %}bg-yellow-100 text-yellow-600{% elif icon == 'list' %}bg-gray-100 text-gray-600{% else %}bg-green-100 text-green-600{% endif %}">
+        
+        {# Icon SVG based on type #}
+        {% if icon == 'bell' %}
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-7 h-7">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.332 4.053 4.053 0 00-2.013-4.056 2.022 2.022 0 01-.699-.54l-1.424-1.797M6.9 17.082a23.848 23.848 0 01-.566-2.024M9.9 13.5h1.125M9.9 16.5h1.125M9.9 19.5h1.125" />
+        </svg>
+        {% elif icon == 'list' %}
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-7 h-7">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M12 17.25h8.25" />
+        </svg>
+        {% else %} {# check #}
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-7 h-7">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        {% endif %}
+    </div>
+</div>

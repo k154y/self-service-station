@@ -1,0 +1,62 @@
+<div id="add-station-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-6 border w-96 shadow-lg rounded-xl bg-white">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold text-gray-900">Add New Station</h3>
+            <button onclick="document.getElementById('add-station-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <form method="POST" action="{% url 'station_create' %}">
+            {% csrf_token %}
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Station Name</label>
+                    <input type="text" name="name" required class="mt-1 block w-full border border-gray-300 rounded-lg p-2.5 focus:ring-red-500 focus:border-red-500">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Location</label>
+                    <input type="text" name="location" required class="mt-1 block w-full border border-gray-300 rounded-lg p-2.5 focus:ring-red-500 focus:border-red-500">
+                </div>
+
+                {# Only show Company selection to Admins. Owners already know their company. #}
+                {% if user_role == 'admin' %}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Company</label>
+                    <select name="company_id" required class="mt-1 block w-full border border-gray-300 rounded-lg p-2.5 bg-white focus:ring-red-500 focus:border-red-500">
+                        <option value="" disabled selected>Select Company</option>
+                        {% for company in all_companies %}
+                            <option value="{{ company.company }}">{{ company.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% elif user_role == 'owner' %}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Company</label>
+                    <select name="company_id" required class="mt-1 block w-full border border-gray-300 rounded-lg p-2.5 bg-white focus:ring-red-500 focus:border-red-500">
+                        {# Owners might have multiple companies, let them choose one of theirs #}
+                        {% for company in owner_companies %}
+                            <option value="{{ company.company }}">{{ company.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Status</label>
+                    <select name="status" class="mt-1 block w-full border border-gray-300 rounded-lg p-2.5 bg-white focus:ring-red-500 focus:border-red-500">
+                        <option value="active">Active</option>
+                        <option value="maintenance">Maintenance</option>
+                        <option value="closed">Closed</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end space-x-3">
+                <button type="button" onclick="document.getElementById('add-station-modal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">Add Station</button>
+            </div>
+        </form>
+    </div>
+</div>
