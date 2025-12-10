@@ -56,25 +56,35 @@ class Station(models.Model):
 
 class Pump(models.Model):
     pump_id = models.AutoField(primary_key=True)
-    station= models.ForeignKey(Station, on_delete=models.CASCADE, related_name='pumps')
+    station = models.ForeignKey(Station, on_delete=models.CASCADE, related_name='pumps')
     pump_number = models.IntegerField()
-    fuel_type = models.CharField(max_length=50)
+    
+    # ----------------------------------------------------
+    # ADDED: FUEL_CHOICES
+    FUEL_CHOICES = [
+        ('petrol', 'Petrol (Gasoline)'),
+        ('diesel', 'Diesel'),
+        # Add other fuel types if needed, e.g., ('super', 'Super Petrol')
+    ]
+    fuel_type = models.CharField(
+        max_length=50, 
+        choices=FUEL_CHOICES, # Using the choices
+        default='petrol'     # Set a default
+    )
+    # ----------------------------------------------------
+    
     STATUS_CHOICES = [
         ('active', 'Active'),
         ('offline', 'Offline'),
-        
     ]
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     flow_rate = models.FloatField(null=True, blank=True)
     
-
     class Meta:
         unique_together = ('station', 'pump_number')
 
     def __str__(self):
         return f"Pump {self.pump_number} - {self.station.name}"
-
-
 
 # System Settings
 
