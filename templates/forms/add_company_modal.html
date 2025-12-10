@@ -1,7 +1,7 @@
 <div id="add-company-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
     <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
         <h3 class="text-lg font-medium leading-6 text-gray-900 mb-4">Add New Company</h3>
-        <form method="POST" action="{% url 'add_company' %}">
+        <form method="POST" action="{% url 'company_create' %}">
             {% csrf_token %}
             <label for="company-name" class="block text-sm font-medium text-gray-700">Company Name</label>
             <input type="text" id="company-name" name="name" required class="mt-1 block w-full border border-gray-300 rounded-lg">

@@ -2,10 +2,10 @@
 {% load static %}
 
 {% block page_title %}
-    {% if form.instance.pk %}Edit Pump #{{ form.instance.pump_number }}{% else %}Register New Pump{% endif %}
+    {% if form.instance.pk %}Edit Company: {{ form.instance.name }}{% else %}Create New Company{% endif %}
 {% endblock %}
 {% block page_description %}
-    {% if form.instance.pk %}Update the configuration for this fuel pump.{% else %}Enter the details for the new fuel pump.{% endif %}
+    {% if form.instance.pk %}Update the company's details.{% else %}Fill in the details for the new company.{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -14,7 +14,7 @@
     <form method="post" class="space-y-6">
         {% csrf_token %}
 
-        {# --- Non-field errors --- #}
+        {# --- Non-field errors (e.g., uniqueness constraints) --- #}
         {% if form.non_field_errors %}
             <div class="p-3 rounded-lg text-sm border bg-red-50 text-red-700 border-red-200">
                 {% for error in form.non_field_errors %}
@@ -23,14 +23,14 @@
             </div>
         {% endif %}
 
-        {# --- Form Fields --- #}
+        {# --- Form Fields (Iterate for styling) --- #}
         {% for field in form %}
             <div>
                 <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">
                     {{ field.label }}
-                    {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
                 </label>
                 <div class="mt-1">
+                    {# Render the field itself with Tailwind classes #}
                     {{ field }}
                     {% if field.errors %}
                         <p class="mt-1 text-sm text-red-600">{{ field.errors.as_text }}</p>
@@ -44,11 +44,11 @@
 
         {# --- Action Buttons --- #}
         <div class="flex justify-end space-x-3 pt-4">
-            <a href="{% url 'pump_list' %}" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors">
+            <a href="{% url 'company_list' %}" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors">
                 Cancel
             </a>
             <button type="submit" class="px-6 py-2 text-sm font-medium text-white bg-brand-blue rounded-lg shadow-md hover:bg-brand-blue/90 transition-colors">
-                {% if form.instance.pk %}Save Changes{% else %}Register Pump{% endif %}
+                {% if form.instance.pk %}Save Changes{% else %}Create Company{% endif %}
             </button>
         </div>
     </form>

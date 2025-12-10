@@ -1,0 +1,21 @@
+{# Used to render a single field consistently (Input, Select) #}
+{% load widget_tweaks %}
+
+<div class="sm:col-span-1">
+    <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">
+        {{ field.label }}{% if field.field.required %} <span class="text-red-500">*</span>{% endif %}
+    </label>
+    <div class="mt-1">
+        {% if field.field.widget|field_type == 'select' %}
+            {% render_field field class="shadow-sm focus:ring-brand-blue focus:border-brand-blue block w-full sm:text-sm border-gray-300 rounded-md" %}
+        {% else %}
+            {% render_field field class="shadow-sm focus:ring-brand-blue focus:border-brand-blue block w-full sm:text-sm border-gray-300 rounded-md" type=type %}
+        {% endif %}
+    </div>
+    {% for error in field.errors %}
+        <p class="mt-2 text-sm text-red-600">{{ error }}</p>
+    {% endfor %}
+    {% if field.help_text %}
+        <p class="mt-2 text-xs text-gray-500">{{ field.help_text }}</p>
+    {% endif %}
+</div>

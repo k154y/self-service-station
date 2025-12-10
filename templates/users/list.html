@@ -1,99 +1,122 @@
 {% extends 'base.html' %}
+{% load static %}
+{% load humanize %} 
 
-{% block page_title %}User Management{% endblock %}
-{% block page_description %}Manage system users and their roles{% endblock %}
+{% block page_title %}System Users{% endblock %}
+{% block page_description %}View and manage all system users and their roles.{% endblock %}
 
 {% block header_actions %}
-<a href="{% url 'user_create' %}" class="btn btn-primary">➕ Add New User</a>
+<a href="{% url 'user_create' %}" class="flex items-center px-4 py-2 bg-brand-blue text-white text-sm font-medium rounded-lg shadow hover:bg-brand-blue/90 transition-colors">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 mr-2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+    </svg>
+    Add New User
+</a>
 {% endblock %}
 
 {% block content %}
-<div class="card">
-    <div class="card-header">
-        <h3 class="card-title">System Users</h3>
-        <span>Total Users: {{ users.count }}</span>
+
+<div class="space-y-6">
+
+    <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+        
+        <div class="flex justify-between items-center mb-4 border-b pb-4">
+            <h3 class="text-lg font-semibold text-gray-900">System Users</h3>
+            <p class="text-sm font-medium text-gray-500">Total Users: {{ users.count|intcomma }}</p>
+        </div>
+
+        {% if users %}
+        {# --- User Table --- #}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for user in users %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {{ user.username }}
+                            {% if user.user_id == request.session.user_id %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 ml-1">You</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">{{ user.full_name }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ user.email|default:"-" }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            {# Styling the role badge using the colors from other pages where possible #}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium 
+                                {% if user.role == 'admin' %}bg-brand-blue/10 text-brand-blue font-semibold
+                                {% elif user.role == 'owner' %}bg-yellow-100 text-yellow-800
+                                {% elif user.role == 'manager' %}bg-green-100 text-green-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ user.get_role_display|capfirst }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ user.created_at|date:"Y-m-d" }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                            <a href="{% url 'user_update' user.user_id %}" class="text-indigo-600 hover:text-indigo-900">
+                                Edit
+                            </a>
+                            
+                            {% if user.user_id != request.session.user_id %}
+                            <a href="{% url 'user_delete' user.user_id %}" class="text-red-600 hover:text-red-900 ml-3">
+                                Delete
+                            </a>
+                            {% else %}
+                            <span class="text-gray-400 cursor-not-allowed ml-3" title="Cannot delete yourself">Delete</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-6 py-10 text-center text-gray-500">
+            <p class="mb-4">No users found in the system.</p>
+            <a href="{% url 'user_create' %}" class="px-4 py-2 bg-brand-blue text-white text-sm font-medium rounded-lg shadow hover:bg-brand-blue/90 transition-colors">
+                Create First User
+            </a>
+        </div>
+        {% endif %}
     </div>
 
-    {% if users %}
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Username</th>
-                <th>Full Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Created</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for user in users %}
-            <tr>
-                <td>
-                    <strong>{{ user.username }}</strong>
-                    {% if user.user_id == request.session.user_id %}
-                    <span class="status-badge status-active" style="font-size: 0.7rem;">You</span>
-                    {% endif %}
-                </td>
-                <td>{{ user.full_name }}</td>
-                <td>{{ user.email|default:"-" }}</td>
-                <td>
-                    <span class="status-badge 
-                        {% if user.role == 'admin' %}status-active
-                        {% elif user.role == 'owner' %}status-pending
-                        {% else %}status-resolved{% endif %}">
-                        {{ user.get_role_display }}
-                    </span>
-                </td>
-                <td>{{ user.created_at|date:"M d, Y" }}</td>
-                <td>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <a href="{% url 'user_update' user.user_id %}" class="btn btn-warning btn-sm">✏️ Edit</a>
-                        {% if user.user_id != request.session.user_id %}
-                        <a href="{% url 'user_delete' user.user_id %}" class="btn btn-danger btn-sm">🗑️ Delete</a>
-                        {% else %}
-                        <button class="btn btn-secondary btn-sm" disabled>🗑️ Delete</button>
-                        {% endif %}
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <div style="padding: 3rem; text-align: center; color: #7f8c8d;">
-        <p>No users found in the system.</p>
-        <a href="{% url 'user_create' %}" class="btn btn-primary">Create First User</a>
-    </div>
-    {% endif %}
-</div>
-
-<!-- Role Legend -->
-<div class="card" style="margin-top: 2rem;">
-    <div class="card-header">
-        <h3 class="card-title">Role Permissions</h3>
-    </div>
-    <div style="padding: 1.5rem;">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-            <div>
-                <strong>👑 Admin</strong>
-                <p style="margin: 0.5rem 0 0 0; color: #7f8c8d; font-size: 0.9rem;">
-                    Full system access, can manage all users, companies, and stations
+    {# --- Role Legend (Moved to a separate card for clarity) --- #}
+    <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4 border-b pb-4">Role Permissions Overview</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <div class="p-4 bg-brand-blue/5 rounded-lg border border-brand-blue/20">
+                <p class="font-bold text-brand-blue">👑 Admin</p>
+                <p class="mt-1 text-gray-600 text-sm">
+                    Full system access; manages all users, companies, stations, and global settings.
                 </p>
             </div>
-            <div>
-                <strong>🏢 Owner</strong>
-                <p style="margin: 0.5rem 0 0 0; color: #7f8c8d; font-size: 0.9rem;">
-                    Can manage their companies and assigned stations
+            
+            <div class="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                <p class="font-bold text-yellow-800">🏢 Owner</p>
+                <p class="mt-1 text-gray-600 text-sm">
+                    Can manage their owned companies and assigned stations/pumps.
                 </p>
             </div>
-            <div>
-                <strong>👨‍💼 Manager</strong>
-                <p style="margin: 0.5rem 0 0 0; color: #7f8c8d; font-size: 0.9rem;">
-                    Can manage assigned stations, pumps, and transactions
+            
+            <div class="p-4 bg-green-50 rounded-lg border border-green-200">
+                <p class="font-bold text-green-800">👨‍💼 Manager</p>
+                <p class="mt-1 text-gray-600 text-sm">
+                    Can manage assigned stations, monitor inventory, and handle transactions.
                 </p>
             </div>
         </div>
     </div>
 </div>
+
 {% endblock %}

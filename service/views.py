@@ -286,7 +286,7 @@ class UserUpdateView(UpdateView):
 
 class UserDeleteView(DeleteView):
     model = User
-    template_name = "users/confirm_delete.html"
+    template_name = "users/delete.html"
     success_url = reverse_lazy('user_list')
     pk_url_kwarg = 'user_id'
     
@@ -365,7 +365,7 @@ class StationUpdateView(UpdateView):
 
 class StationDeleteView(DeleteView):
     model = Station
-    template_name = "stations/confirm_delete.html"
+    template_name = "stations/delete.html"
     success_url = reverse_lazy('station_list')
     pk_url_kwarg = 'station_id'
     

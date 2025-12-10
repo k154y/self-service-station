@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block page_title %}
+    {% if form.instance.pk %}Edit User: {{ form.instance.username }}{% else %}Create New User{% endif %}
+{% endblock %}
+
+{% block page_description %}
+    {% if form.instance.pk %}Update the details for this user.{% else %}Fill out the form to register a new system user.{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg p-6">
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+
+            {# Form Errors Section #}
+            {% if form.non_field_errors %}
+            <div class="bg-red-50 border-l-4 border-red-400 p-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm font-medium text-red-800">Please correct the following errors:</p>
+                        <ul class="mt-2 text-sm text-red-700 list-disc pl-5 space-y-1">
+                            {% for error in form.non_field_errors %}
+                            <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:gap-x-8">
+                
+                {# Full Name Field #}
+                {% include "partials/form_field.html" with field=form.full_name type='text' %}
+
+                {# Username Field #}
+                {% include "partials/form_field.html" with field=form.username type='text' %}
+
+                {# Email Field #}
+                {% include "partials/form_field.html" with field=form.email type='email' %}
+                
+                {# Role Field (Only visible and usable by Admin/Owner) #}
+                {% if form.role %}
+                    {% include "partials/form_field.html" with field=form.role type='select' %}
+                {% endif %}
+
+                {# Password Field - Required for Create, Optional for Update #}
+                {% if not form.instance.pk %}
+                    {# Create View: Password is required #}
+                    {% include "partials/form_field.html" with field=form.password type='password' help_text='Password is required for new users.' %}
+                {% else %}
+                    {# Update View: Password field must be manually managed in UpdateView or excluded if not changing #}
+                    {% include "partials/form_field.html" with field=form.password type='password' help_text='Leave blank if you do not want to change the password.' %}
+                {% endif %}
+
+            </div>
+
+            <div class="pt-5 flex justify-end space-x-3">
+                <a href="{% url 'user_list' %}" class="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-blue">
+                    Cancel
+                </a>
+                <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                    {% if form.instance.pk %}Save Changes{% else %}Create User{% endif %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

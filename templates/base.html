@@ -141,6 +141,11 @@
                         {% if 'station' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
                         <span class="mr-3 w-5 h-5"></span> Stations
                     </a></li>
+
+                    <li><a href="{% url 'pump_list' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg transition-colors font-medium 
+                       {% if 'pump' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
+                       <span class="mr-3 w-5 h-5"></span> Pumps
+                    </a></li>
                     {% endif %}
                     
                     {% endwith %}
