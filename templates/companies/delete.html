@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block page_title %}Delete Company: {{ company.name }}{% endblock %}
+{% block page_description %}Confirm you want to permanently remove this company and all associated data.{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto bg-white shadow overflow-hidden sm:rounded-lg">
+    <div class="p-8">
+        <div class="text-center">
+            <svg class="mx-auto h-16 w-16 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.021 3.375 1.769 3.375h12.566c1.748 0 2.634-1.875 1.769-3.375l-6.23-10.8c-.521-.906-1.609-.906-2.13 0l-6.23 10.8zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+            <h3 class="mt-4 text-2xl font-bold text-gray-900">Confirm Deletion of Company</h3>
+            <p class="mt-2 text-md text-gray-600">
+                You are about to delete the company: <strong class="text-red-600">{{ company.name }}</strong>.
+            </p>
+        </div>
+
+        <div class="mt-6 border border-red-300 bg-red-50 p-4 rounded-lg">
+            <h4 class="text-lg font-semibold text-red-700 flex items-center">
+                <svg class="w-6 h-6 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.021 3.375 1.769 3.375h12.566c1.748 0 2.634-1.875 1.769-3.375l-6.23-10.8c-.521-.906-1.609-.906-2.13 0l-6.23 10.8z" />
+                </svg>
+                CRITICAL WARNING: CASCADE DELETE
+            </h4>
+            <p class="mt-2 text-sm text-red-600 font-medium">
+                Due to the relationship settings, deleting this Company will **irrevocably delete** the following related data:
+            </p>
+            <ul class="mt-3 text-sm text-red-500 list-disc pl-5 space-y-1">
+                <li>**All Fuel Stations** ({{ company.stations.count|default:0 }}) belonging to this company.</li>
+                <li>**All Inventory records** associated with these stations.</li>
+                <li>**All Pumps** associated with these stations.</li>
+                <li>**All Transactions** and **Alerts** tied to these stations.</li>
+            </ul>
+            <p class="mt-4 text-sm font-bold text-red-700">
+                This action cannot be recovered. Please proceed with extreme caution.
+            </p>
+        </div>
+        
+        <dl class="mt-6 border-t border-b border-gray-200 divide-y divide-gray-200">
+            <div class="py-3 flex justify-between text-sm font-medium">
+                <dt class="text-gray-500">Owner</dt>
+                <dd class="text-gray-900">{{ company.owner.full_name }} ({{ company.owner.username }})</dd>
+            </div>
+            <div class="py-3 flex justify-between text-sm font-medium">
+                <dt class="text-gray-500">Stations to be Deleted</dt>
+                {# Using the related_name defined in the Company model (stations) #}
+                <dd class="text-red-600 font-bold">{{ company.stations.count|default:0 }}</dd> 
+            </div>
+            <div class="py-3 flex justify-between text-sm font-medium">
+                <dt class="text-gray-500">Created Date</dt>
+                <dd class="text-gray-900">{{ company.created_at|date:"M d, Y" }}</dd>
+            </div>
+        </dl>
+
+        <form method="post" class="mt-8 flex justify-center space-x-3">
+            {% csrf_token %}
+            <a href="{% url 'company_list' %}" class="w-full sm:w-auto bg-white py-2 px-6 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-blue">
+                Cancel
+            </a>
+            <button type="submit" class="w-full sm:w-auto inline-flex justify-center py-2 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                Yes, Delete Company & All Data
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

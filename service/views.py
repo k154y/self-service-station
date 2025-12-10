@@ -323,7 +323,7 @@ class CompanyUpdateView(UpdateView):
 
 class CompanyDeleteView(DeleteView):
     model = Company
-    template_name = "companies/confirm_delete.html"
+    template_name = "companies/delete.html"
     success_url = reverse_lazy('company_list')
     pk_url_kwarg = 'company_id'
     

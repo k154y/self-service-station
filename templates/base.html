@@ -6,19 +6,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Fuel Station Management{% endblock %}</title>
-    
+
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
                         brand: {
-                            blue: '#104097', // Deep corporate blue
+                            blue: '#104097',
                         },
-                        // Custom colors used in the dashboard image
-                        petrol: '#00A3C9', 
+                        petrol: '#00A3C9',
                         diesel: '#33CC66',
                     },
                     fontFamily: {
@@ -28,34 +27,36 @@
             }
         }
     </script>
-    
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
+
     <style>
-        /* Ensures content is not hidden by the fixed sidebar in a flex layout */
+        /* Sidebar sizing and main content offset on desktop */
         .sidebar {
-            /* Fixed width for the sidebar */
-            width: 16rem; /* equivalent to w-64 */
+            width: 16rem;
             min-width: 16rem;
         }
         .main-container {
-            /* Adjust margin to account for the fixed sidebar width (16rem = 256px) */
             margin-left: 16rem;
             padding: 2rem;
         }
-        
-        /* Custom scrollbar for aesthetic purposes */
-        .sidebar::-webkit-scrollbar {
-            width: 4px;
-        }
+
+        .sidebar::-webkit-scrollbar { width: 4px; }
         .sidebar::-webkit-scrollbar-thumb {
-            background-color: rgba(160, 160, 160, 0.5);
+            background-color: rgba(160,160,160,0.5);
             border-radius: 4px;
         }
-        /* Mobile adjustment to hide sidebar */
+
+        /* Mobile: hide sidebar off-canvas and reset main spacing */
         @media (max-width: 768px) {
             .sidebar {
-                display: none;
+                transform: translateX(-100%);
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100%;
+                z-index: 40;
+                will-change: transform;
             }
             .main-container {
                 margin-left: 0;
@@ -69,8 +70,8 @@
     {# Main structural check: Only display if a user is logged in (has a user_id in session) #}
     {% if request.session.user_id %}
     <div class="flex min-h-screen">
-        <aside class="sidebar bg-white border-r border-gray-100 flex flex-col py-6 shadow-xl fixed h-full overflow-y-auto">
-            
+        <aside id="sidebar" class="sidebar bg-white border-r border-gray-100 flex flex-col py-6 shadow-xl fixed h-full overflow-y-auto transform md:translate-x-0 transition-transform duration-200 ease-in-out">
+
             <div class="px-6 pb-6 border-b border-gray-100">
                 <h1 class="text-xl font-bold text-gray-900 flex items-center">
                     <span class="mr-2 w-6 h-6 bg-brand-blue rounded-full flex items-center justify-center text-white">
@@ -82,38 +83,38 @@
                     FUEL STATION
                 </h1>
             </div>
-            
+
             <nav class="flex-grow px-4 mt-4">
                 <ul class="space-y-1">
                     {% with current_url=request.resolver_match.url_name %}
-                    
+
                     {# --- Universal Navigation --- #}
                     <li><a href="{% url 'dashboard' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg transition-colors font-medium 
                         {% if current_url == 'dashboard' %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
                         <span class="mr-3 w-5 h-5"></span> Dashboard
                     </a></li>
-                    
+
                     <li><a href="{% url 'inventory_list' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg transition-colors font-medium 
                         {% if 'inventory' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
                         <span class="mr-3 w-5 h-5"></span> Inventory
                     </a></li>
-                    
+
                     <li><a href="{% url 'pump_list' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg transition-colors font-medium 
                         {% if 'pump' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
                         <span class="mr-3 w-5 h-5"></span> Pumps
                     </a></li>
-                    
+
                     <li><a href="{% url 'transaction_list' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg transition-colors font-medium 
                         {% if 'transaction' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
                         <span class="mr-3 w-5 h-5"></span> Transactions
                     </a></li>
-                    
+
                     <li><a href="{% url 'alert_list' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg transition-colors font-medium 
                         {% if 'alert' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
                         <span class="mr-3 w-5 h-5"></span> Alerts
                     </a></li>
-                    
-                    {# The Settings link is now universal too (unless a specific role is excluded) #}
+
+                    {# The Settings link: hidden for manager role #}
                     {% if request.session.role != 'manager' %}
                     <li><a href="{% url 'settings_list' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg transition-colors font-medium 
                         {% if 'settings' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
@@ -126,17 +127,17 @@
                     <li class="pt-4 border-t border-gray-100 mt-4">
                         <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider px-2 mb-1">Admin Tools</p>
                     </li>
-                    
+
                     <li><a href="{% url 'user_list' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors font-medium 
                         {% if 'user' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
                         <span class="mr-3 w-5 h-5"></span> Users
                     </a></li>
-                    
+
                     <li><a href="{% url 'company_list' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors font-medium 
                         {% if 'company' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
                         <span class="mr-3 w-5 h-5"></span> Companies
                     </a></li>
-                    
+
                     <li><a href="{% url 'station_list' %}" class="flex items-center px-2 py-2.5 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors font-medium 
                         {% if 'station' in current_url %}bg-brand-blue/10 text-brand-blue font-semibold{% else %}hover:bg-gray-100 hover:text-gray-900{% endif %}">
                         <span class="mr-3 w-5 h-5"></span> Stations
@@ -147,11 +148,11 @@
                        <span class="mr-3 w-5 h-5"></span> Pumps
                     </a></li>
                     {% endif %}
-                    
+
                     {% endwith %}
                 </ul>
             </nav>
-            
+
             <div class="px-4 mt-auto pt-4 border-t border-gray-100">
                 <a href="{% url 'logout' %}" class="flex items-center w-full px-2 py-2.5 text-red-500 rounded-lg hover:bg-red-50 transition-colors font-medium">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 mr-3">
@@ -162,17 +163,24 @@
             </div>
         </aside>
 
+        <!-- Mobile overlay (hidden by default) -->
+        <div id="sidebar-overlay" class="hidden fixed inset-0 bg-black bg-opacity-30 z-30 md:hidden"></div>
+
         <main class="main-container flex-grow">
-            
+
             <div class="flex justify-between items-start pb-4 mb-4">
                 <div>
-                    {# BLOCK TAG DEFINED ONCE #}
                     <h2 class="text-xl font-semibold text-gray-900">{% block page_title %}Dashboard{% endblock %}</h2>
-                    {# BLOCK TAG DEFINED ONCE #}
                     <p class="text-sm text-gray-500 mt-0.5">{% block page_description %}Real-time monitoring and management dashboard{% endblock %}</p>
                 </div>
                 <div class="flex space-x-3 items-center">
-                    {# BLOCK TAG DEFINED ONCE #}
+                    <!-- Mobile hamburger button -->
+                    <button id="mobile-menu-btn" class="md:hidden p-2 rounded bg-gray-100 hover:bg-gray-200" aria-label="Toggle menu">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                        </svg>
+                    </button>
+
                     {% block header_actions %}{% endblock %}
                 </div>
             </div>
@@ -187,34 +195,70 @@
             </div>
             {% endif %}
 
-            {# BLOCK TAG DEFINED ONCE #}
-            {% block content %}
-            {% endblock %}
+            {% block content %}{% endblock %}
         </main>
     </div>
     {% else %}
-    {# If no user is logged in, you should probably redirect or show a login page #}
-    {# For a base template, this is often left empty or contains minimal content/redirect #}
     <div class="flex items-center justify-center min-h-screen">
         <p class="text-gray-500">Please log in to view the dashboard.</p>
     </div>
     {% endif %}
 
     <script>
+    document.addEventListener('DOMContentLoaded', function() {
         // Auto-hide messages after 5 seconds
-        document.addEventListener('DOMContentLoaded', function() {
-            // Note: The selector in the original code `.alert` is incorrect based on the
-            // messages template code. Use the parent div in the messages loop.
-            const messageContainers = document.querySelectorAll('.mb-6 > div');
-            messageContainers.forEach(message => {
-                setTimeout(() => {
-                    message.style.opacity = '0';
-                    message.style.transition = 'opacity 0.5s';
-                    setTimeout(() => message.remove(), 500);
-                }, 5000);
-            });
+        const messageContainers = document.querySelectorAll('.mb-6 > div');
+        messageContainers.forEach(message => {
+            setTimeout(() => {
+                message.style.opacity = '0';
+                message.style.transition = 'opacity 0.5s';
+                setTimeout(() => message.remove(), 500);
+            }, 5000);
         });
+
+        // Mobile sidebar toggle
+        const btn = document.getElementById('mobile-menu-btn');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+
+        function openSidebar() {
+            if (!sidebar) return;
+            sidebar.style.transform = 'translateX(0)';
+            overlay.classList.remove('hidden');
+        }
+        function closeSidebar() {
+            if (!sidebar) return;
+            sidebar.style.transform = 'translateX(-100%)';
+            overlay.classList.add('hidden');
+        }
+
+        if (btn && sidebar && overlay) {
+            btn.addEventListener('click', function() {
+                const isOpen = !overlay.classList.contains('hidden');
+                if (isOpen) closeSidebar();
+                else openSidebar();
+            });
+
+            overlay.addEventListener('click', closeSidebar);
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') closeSidebar();
+            });
+
+            window.addEventListener('resize', function() {
+                if (window.innerWidth > 768) {
+                    sidebar.style.transform = '';
+                    overlay.classList.add('hidden');
+                } else {
+                    if (overlay.classList.contains('hidden')) sidebar.style.transform = 'translateX(-100%)';
+                }
+            });
+
+            if (window.innerWidth <= 768) sidebar.style.transform = 'translateX(-100%)';
+        }
+    });
     </script>
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>
