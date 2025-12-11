@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Record Transaction{% endblock %}
+
+{% block content %}
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0"><i class="fas fa-receipt"></i> Record New Transaction</h3>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        {# STATION ID FIELD #}
+                        <div class="mb-3">
+                            <label for="{{ form.station_id.id_for_label }}" class="form-label required">Station</label>
+                            <select name="{{ form.station_id.name }}" id="{{ form.station_id.id_for_label }}" class="form-select" required>
+                                <option value="" disabled selected>Select the Station</option>
+                                {% for station in stations %}
+                                    <option value="{{ station.station_id }}" {% if form.station_id.value == station.station_id|stringformat:"i" %}selected{% endif %}>
+                                        {{ station.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            {% if form.station_id.errors %}
+                                <div class="invalid-feedback d-block">{{ form.station_id.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        {# PUMP ID FIELD - Filtered by Station in JS (optional, but good practice) #}
+                        <div class="mb-3">
+                            <label for="{{ form.pump_id.id_for_label }}" class="form-label required">Pump</label>
+                            <select name="{{ form.pump_id.name }}" id="{{ form.pump_id.id_for_label }}" class="form-select" required>
+                                <option value="" disabled selected>Select Pump</option>
+                                {% for pump in pumps %}
+                                    <option value="{{ pump.pump_id }}" data-station="{{ pump.station.station_id }}" {% if form.pump_id.value == pump.pump_id|stringformat:"i" %}selected{% endif %}>
+                                        Pump {{ pump.pump_number }} ({{ pump.station.name }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            {% if form.pump_id.errors %}
+                                <div class="invalid-feedback d-block">{{ form.pump_id.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        {# Fuel Type, Quantity, Payment Method, Car Plate #}
+                        {% include 'partials/form-field.html' with field=form.fuel_type %}
+                        {% include 'partials/form-field.html' with field=form.quantity %}
+                        {% include 'partials/form-field.html' with field=form.payment_method %}
+                        {% include 'partials/form-field.html' with field=form.car_plate %}
+
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-plus-circle"></i> Record Sale
+                            </button>
+                            <a href="{% url 'transaction_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Simple client-side filtering logic for pumps based on selected station
+    document.addEventListener('DOMContentLoaded', function() {
+        const stationSelect = document.getElementById('{{ form.station_id.id_for_label }}');
+        const pumpSelect = document.getElementById('{{ form.pump_id.id_for_label }}');
+        const allPumpOptions = Array.from(pumpSelect.options).slice(1); // Exclude the "Select Pump" option
+
+        function filterPumps() {
+            const selectedStationId = stationSelect.value;
+            pumpSelect.innerHTML = '<option value="" disabled selected>Select Pump</option>';
+
+            allPumpOptions.forEach(option => {
+                if (option.dataset.station === selectedStationId) {
+                    pumpSelect.appendChild(option.cloneNode(true));
+                }
+            });
+            // Re-select current value if it exists and is valid
+            const currentPumpValue = "{{ form.pump_id.value }}";
+            if (currentPumpValue) {
+                const currentOption = pumpSelect.querySelector(`option[value="${currentPumpValue}"]`);
+                if (currentOption) {
+                    currentOption.selected = true;
+                }
+            }
+        }
+
+        stationSelect.addEventListener('change', filterPumps);
+        
+        // Initial call to set correct pumps if form is loaded with existing data/errors
+        if (stationSelect.value) {
+            filterPumps();
+        }
+    });
+</script>
+{% endblock %}

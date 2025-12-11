@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Update Alert Status{% endblock %}
+
+{% block content %}
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h3 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Update Alert Status</h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        Alert ID: **{{ object.alert_id }}** | Type: **{{ object.get_type_display }}** | Station: **{{ object.station.name }}**
+                    </p>
+                    <blockquote class="blockquote bg-light p-3 border-start border-warning border-5">
+                        <p class="mb-0">{{ object.description }}</p>
+                        <footer class="blockquote-footer">Created at: {{ object.created_at|date:"Y-m-d H:i" }}</footer>
+                    </blockquote>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        {# Status Field Only #}
+                        {% include 'partials/form-field.html' with field=form.status %}
+
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-check-circle"></i> Save Status
+                            </button>
+                            <a href="{% url 'alert_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
