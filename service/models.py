@@ -121,9 +121,17 @@ class SystemSetting(models.Model):
 
 
 # Inventory (Weak Entity)
+# Inventory (Weak Entity)
 class Inventory(models.Model):
     inventory_id = models.AutoField(primary_key=True)
-    station_id= models.ForeignKey(Station, on_delete=models.CASCADE, related_name='inventory')
+    
+    # CORRECTED: Changed 'station_id' to 'station' (Recommended Django convention)
+    station = models.ForeignKey(
+        'Station', # Use string reference if Station model is defined below Inventory
+        on_delete=models.CASCADE, 
+        related_name='inventory'
+    )
+    
     fuel_type = models.CharField(max_length=50)
     quantity = models.FloatField()
     capacity = models.FloatField()
@@ -132,9 +140,11 @@ class Inventory(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('station_id', 'fuel_type')
+        # CORRECTED: Updated to use 'station' field name
+        unique_together = ('station', 'fuel_type')
 
     def __str__(self):
+        # FIXED: This now correctly uses 'self.station' which exists
         return f"{self.station.name} - {self.fuel_type}"
 
 

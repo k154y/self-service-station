@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Pump Monitoring Dashboard{% endblock %}
+{% block page_description %}Real-time pump status and control overview.{% endblock %}
+
+{% block content %}
+
+<div class="space-y-6">
+
+    {# --- Status Overview Cards --- #}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {# Note: Assuming you have a partial for status_card.html #}
+        {% include 'pumps/status_card.html' with title='Active' count=active_count color='text-green-600' %}
+        {% include 'pumps/status_card.html' with title='Maintenance' count=maintenance_count color='text-yellow-600' %}
+        {% include 'pumps/status_card.html' with title='Offline' count=offline_count color='text-red-600' %}
+    </div>
+
+    {# --- Filtering Options (Admin/Owner Only) --- #}
+    {% if user_role == 'Admin' or user_role == 'Owner' %}
+    <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <form method="get" class="flex flex-wrap items-center gap-4">
+            <h4 class="text-sm font-semibold text-gray-700">Filter Pumps:</h4>
+            
+            {% if user_role == 'Admin' %}
+            {# Admin can filter by Company #}
+            <div>
+                <label for="company_filter" class="sr-only">Company</label>
+                <select id="company_filter" name="company_id" class="block w-40 rounded-md border-gray-300 shadow-sm focus:border-brand-blue focus:ring-brand-blue sm:text-sm">
+                    <option value="all">All Companies</option>
+                    {% for company in filterable_companies %}
+                    <option value="{{ company.pk }}" {% if request.GET.company_id|stringformat:"i" == company.pk|stringformat:"i" %}selected{% endif %}>
+                        {{ company.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            {# Admin & Owner can filter by Station #}
+            <div>
+                <label for="station_filter" class="sr-only">Station</label>
+                <select id="station_filter" name="station_id" class="block w-40 rounded-md border-gray-300 shadow-sm focus:border-brand-blue focus:ring-brand-blue sm:text-sm">
+                    <option value="all">All Stations</option>
+                    {% for station in filterable_stations %}
+                    <option value="{{ station.pk }}" {% if request.GET.station_id|stringformat:"i" == station.pk|stringformat:"i" %}selected{% endif %}>
+                        {{ station.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-brand-blue hover:bg-brand-blue/90">
+                Apply Filters
+            </button>
+            <a href="{% url 'pump_monitoring' %}" class="text-sm text-gray-500 hover:text-gray-700">Clear</a>
+        </form>
+    </div>
+    {% endif %}
+
+    {# --- Pump List (Display) --- #}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {% for pump in pumps %}
+        <div class="bg-white p-6 rounded-xl shadow-lg border {% if pump.status == 'active' %}border-green-300{% elif pump.status == 'offline' %}border-red-300{% else %}border-yellow-300{% endif %} relative">
+            
+            {# Edit Button (Only visible if allowed, e.g., Manager or above) #}
+            {# Assuming 'pump_status_update' is the modal trigger #}
+            <a href="{% url 'pump_status_update' pump_id=pump.pump_id %}" class="absolute top-4 right-4 p-2 text-gray-400 hover:text-brand-blue transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 18.07a4.99 4.99 0 0 1-1.285.385l-1.928.64a.5.5 0 0 1-.6.6l.64-1.928a4.99 4.99 0 0 1 .385-1.285L16.862 4.487Z" />
+                </svg>
+            </a>
+
+            <h3 class="text-xl font-bold text-gray-900 mb-4">Pump {{ pump.pump_number }}</h3>
+            
+            <dl class="text-sm space-y-2">
+                <div>
+                    <dt class="text-xs font-medium text-gray-500 uppercase">Status</dt>
+                    <dd class="mt-1">
+                        <span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium 
+                            {% if pump.status == 'active' %}bg-green-100 text-green-800{% elif pump.status == 'offline' %}bg-red-100 text-red-800{% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                            {{ pump.get_status_display }}
+                        </span>
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-medium text-gray-500 uppercase">Fuel Type</dt>
+                    <dd class="mt-1 text-gray-800 font-semibold">{{ pump.get_fuel_type_display|default:pump.fuel_type }}</dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-medium text-gray-500 uppercase">Location</dt>
+                    <dd class="mt-1 text-gray-800">{{ pump.station.name }}</dd>
+                </div>
+            </dl>
+        </div>
+        {% empty %}
+        <div class="col-span-full p-6 text-center text-gray-500 bg-white rounded-xl shadow-md border border-gray-200">
+            <p>No pump records found for your assigned stations/companies.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock %}

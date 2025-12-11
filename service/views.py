@@ -199,6 +199,56 @@ def get_user_stations(user_id, user_role):
 
     return Station.objects.none()
 
+
+
+# NEW VIEW FOR THE PUMP MONITORING DASHBOARD
+def pump_monitoring(request):
+    """
+    Displays the pump monitoring dashboard (like the provided image),
+    filtered by user role access.
+    """
+    user_id = request.session.get('user_id')
+    user_role = request.session.get('role')
+
+    if not user_id:
+        messages.error(request, "Please log in to view the pump dashboard.")
+        return redirect('landing_page') # Assume 'landing_page' is the login page
+
+    try:
+        user = User.objects.get(user_id=user_id)
+    except User.DoesNotExist:
+        messages.error(request, "User not found.")
+        return redirect('landing_page')
+
+    # Get authorized stations using the existing helper function
+    stations = get_user_stations(user_id, user_role)
+    
+    # 1. Fetch Pumps: Filter by authorized stations
+    pumps = Pump.objects.filter(station__in=stations).select_related('station').order_by('pump_number')
+    
+    # 2. Status Counts (for the cards)
+    active_count = pumps.filter(status='active').count()
+    offline_count = pumps.filter(status='offline').count()
+    
+    # The image shows "Maintenance". Assuming your model has another choice for maintenance,
+    # or you use 'offline' for both. Based on your model:
+    # STATUS_CHOICES = [('active', 'Active'), ('offline', 'Offline')]
+    # We will use 'offline' for now and add a placeholder for 'maintenance'.
+    maintenance_count = pumps.filter(status='maintenance').count() if 'maintenance' in dict(Pump.STATUS_CHOICES) else 0
+
+    context = {
+        'pumps': pumps,
+        'active_count': active_count,
+        'offline_count': offline_count,
+        'maintenance_count': maintenance_count, # Adjust if your model has a 'maintenance' status
+        'user': user,
+        'user_role': user_role,
+        # We need these for the Admin/Owner filtering dropdowns
+        'filterable_companies': Company.objects.all().order_by('name') if user_role == 'Admin' else Company.objects.filter(owner=user).order_by('name'),
+        'filterable_stations': stations.order_by('name'), # All stations the user has access to
+    }
+    
+    return render(request, 'pumps/monitoring_dashboard.html', context)
 # USER CRUD (Class-Based Views) 
 class UserListView(ListView):
     model = User

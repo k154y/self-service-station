@@ -34,6 +34,16 @@ urlpatterns = [
     path('pumps/<int:pump_id>/status/', views.pump_status_update, name='pump_status_update'),
     path('pumps/<int:pump_id>/delete/', views.PumpDeleteView.as_view(), name='pump_delete'),
     
+    path('pumps/dashboard/', views.pump_monitoring, name='pump_monitoring'), 
+
+    # Existing CRUD views (These are for the Admin tools/full list)
+    path('pumps/', views.PumpListView.as_view(), name='pump_list'),
+    path('pumps/create/', views.PumpCreateView.as_view(), name='pump_create'),
+    path('pumps/<int:pump_id>/update/', views.PumpUpdateView.as_view(), name='pump_update'),
+    path('pumps/<int:pump_id>/delete/', views.PumpDeleteView.as_view(), name='pump_delete'),
+    
+    # Special status update function
+    path('pumps/<int:pump_id>/status/', views.pump_status_update, name='pump_status_update'),
     # Inventory CRUD
     path('inventory/', views.InventoryListView.as_view(), name='inventory_list'),
     path('inventory/<int:inventory_id>/update/', views.InventoryUpdateView.as_view(), name='inventory_update'),
