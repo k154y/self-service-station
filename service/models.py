@@ -111,6 +111,22 @@ class SystemSetting(models.Model):
 
 
 # Inventory (Weak Entity)
+# class Inventory(models.Model):
+#     inventory_id = models.AutoField(primary_key=True)
+#     station_id= models.ForeignKey(Station, on_delete=models.CASCADE, related_name='inventory')
+#     fuel_type = models.CharField(max_length=50)
+#     quantity = models.FloatField()
+#     capacity = models.FloatField()
+#     min_threshold = models.FloatField()
+#     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+#     updated_at = models.DateTimeField(auto_now=True)
+
+#     class Meta:
+#         unique_together = ('station_id', 'fuel_type')
+
+#     def __str__(self):
+#         return f"{self.station.name} - {self.fuel_type}"
+
 class Inventory(models.Model):
     inventory_id = models.AutoField(primary_key=True)
     station_id= models.ForeignKey(Station, on_delete=models.CASCADE, related_name='inventory')
@@ -125,9 +141,8 @@ class Inventory(models.Model):
         unique_together = ('station_id', 'fuel_type')
 
     def __str__(self):
-        return f"{self.station.name} - {self.fuel_type}"
-
-
+        # FIX APPLIED: Changed self.station.name to self.station_id.name
+        return f"{self.station_id.name} - {self.fuel_type}"
 
 # Transactions
 

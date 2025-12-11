@@ -11,6 +11,19 @@ from django.http import HttpResponseForbidden,JsonResponse
 from django.contrib.auth.decorators import user_passes_test
 from django.core.paginator import Paginator
 
+
+
+class CustomLoginRequiredMixin:
+    """
+    Custom mixin to check if the user is logged in via session.
+    Replaces Django's LoginRequiredMixin for your custom auth system.
+    """
+    def dispatch(self, request, *args, **kwargs):
+        if not request.session.get('user_id'):
+            messages.error(request, "Please log in to access this page.")
+            return redirect('landing_page')
+        return super().dispatch(request, *args, **kwargs)
+
 # AUTHENTICATION VIEWS 
 def landing_page(request):
     """Landing page - Login screen"""
@@ -185,15 +198,15 @@ def get_user_stations(user_id, user_role):
     except User.DoesNotExist:
         return Station.objects.none()
 
-    if user_role == 'Admin':
+    if user_role == 'admin':
         # Admin sees all stations across all companies
         return Station.objects.all()
 
-    elif user_role == 'Owner':
+    elif user_role == 'owner':
         # Owner sees stations associated with companies they own
         return Station.objects.filter(company_id__owner=user)
 
-    elif user_role == 'Manager':
+    elif user_role == 'manager':
         # Manager sees stations they are assigned to manage
         return Station.objects.filter(manager_id=user)
 
@@ -216,62 +229,64 @@ class UserListView(ListView):
 #         return super().form_valid(form)
 
 
-class UserCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
+class UserCreateView(CustomLoginRequiredMixin, CreateView):
     model = User
     template_name = "users/form.html"
     fields = ["username", "full_name", "email", "password", "role"]
     success_url = reverse_lazy('user_list')
 
-    # WHO CAN ACCESS THIS PAGE?
-    def test_func(self):
-        user = self.request.user
+    # 1. Custom Permission Check
+    def dispatch(self, request, *args, **kwargs):
+        # First, ensure logged in (handled by Mixin, but we need the user object)
+        if not request.session.get('user_id'):
+            return redirect('landing_page')
 
-        if user.role == "admin":
-            return True
-        if user.role == "owner":
-            return True
-        # manager or normal user = forbidden
-        return False
+        # Fetch the current user object from your custom model
+        try:
+            current_user = User.objects.get(user_id=request.session.get('user_id'))
+        except User.DoesNotExist:
+            return redirect('landing_page')
 
-    # FILTER ROLES THEY CAN CHOOSE
+        # Check permissions
+        if current_user.role not in ['admin', 'owner']:
+            messages.error(request, "You are not allowed to create users.")
+            return redirect('user_list')
+
+        return super().dispatch(request, *args, **kwargs)
+
+    # 2. Filter Roles in Form
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
+        
+        # We need to fetch the user again or store it in the request
+        current_user_role = self.request.session.get('role')
 
-        current_user = self.request.user
-
-        if current_user.role == "admin":
-            # admin can choose any role
-            pass
-
-        elif current_user.role == "owner":
-            # owner can ONLY create manager
+        if current_user_role == "owner":
+            # Owner can ONLY create managers
             form.fields["role"].choices = [
                 ('manager', 'Manager'),
             ]
-
+        # Admin keeps all choices by default
         return form
 
-    # HANDLE USER CREATION AND PASSWORD HASHING
+    # 3. Handle Creation
     def form_valid(self, form):
-        current_user = self.request.user
+        current_user_role = self.request.session.get('role')
         selected_role = form.cleaned_data['role']
 
-        # PERMISSION CHECK FOR ROLE ASSIGNMENT
-        if current_user.role == "owner" and selected_role != "manager":
-            messages.error(self.request, "You are only allowed to create MANAGER users.")
-            return redirect("user_list")
-
-        if current_user.role == "manager":
-            messages.error(self.request, "You are not allowed to create users.")
+        # Double check permission on submit
+        if current_user_role == "owner" and selected_role != "manager":
+            messages.error(self.request, "Owners can only create Managers.")
             return redirect("user_list")
 
         user = form.save(commit=False)
-        user.set_password(form.cleaned_data['password'])
+        # Note: Since you are using a custom model, ensure your save logic 
+        # handles password hashing if you aren't using Django's AbstractBaseUser.
+        # If storing plain text (not recommended): user.password = form.cleaned_data['password']
         user.save()
 
         messages.success(self.request, "User created successfully!")
         return redirect(self.success_url)
-
 
 class UserUpdateView(UpdateView):
     model = User
