@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}System Settings Form{% endblock %}
+
+{% block content %}
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h3 class="mb-0">
+                        {% if object %}
+                            <i class="fas fa-edit"></i> Edit Fuel Price: {{ object.fuel_type }}
+                        {% else %}
+                            <i class="fas fa-plus-circle"></i> Add New Fuel Type Setting
+                        {% endif %}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        {# fuel_type field (should be read-only if object exists) #}
+                        {% include 'partials/form-field.html' with field=form.fuel_type %}
+                        
+                        {# price_per_liter field #}
+                        {% include 'partials/form-field.html' with field=form.price_per_liter %}
+
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save"></i> Save Setting
+                            </button>
+                            <a href="{% url 'settings_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

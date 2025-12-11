@@ -10,6 +10,7 @@ from .models import *
 from django.http import HttpResponseForbidden,JsonResponse
 from django.contrib.auth.decorators import user_passes_test
 from django.core.paginator import Paginator
+from django.db import transaction
 
 
 
@@ -399,6 +400,19 @@ class PumpListView(ListView):
         user_role = self.request.session.get('role')
         stations = get_user_stations(user_id, user_role)
         return Pump.objects.filter(station__in=stations)
+class AdminPumpListView(PumpListView):
+    """
+    Dedicated view for the Admin Pump Management Tool (Table format).
+    Inherits queryset logic but overrides the template.
+    """
+    template_name = "pumps/admin_list.html" # <-- Table View Template
+    
+    # Override get_context_data to ensure unnecessary card counts aren't calculated
+    def get_context_data(self, **kwargs):
+        # We don't need status counts in the table view, so skip the logic from the parent view if it exists.
+        context = super(PumpListView, self).get_context_data(**kwargs)
+        # We still need the pumps queryset which is handled by get_queryset
+        return context
 
 class PumpCreateView(CreateView):
     model = Pump
@@ -517,14 +531,14 @@ class InventoryListView(InventoryAccessMixin, ListView):
         
         # Pass a flag to control the visibility of the "Edit" button in the template
         # Only Admin and Owner can edit, Managers can only view.
-        context['can_edit'] = user_role in ['Admin', 'Owner']
+        context['can_edit'] = user_role in ['admin', 'owner']
         context['user_role'] = user_role
         return context
 
 
 class InventoryUpdateView(InventoryAccessMixin, UpdateView):
     model = Inventory
-    template_name = "inventory/inventory_update.html" # Renamed to match my previous suggestion
+    template_name = "inventory/update.html" # Renamed to match my previous suggestion
     fields = ["quantity", "unit_price", "min_threshold"]
     success_url = reverse_lazy('inventory_list')
     pk_url_kwarg = 'inventory_id'
@@ -539,15 +553,15 @@ class InventoryUpdateView(InventoryAccessMixin, UpdateView):
         user_id = self.request.session.get('user_id')
         
         # Admin can update everything
-        if user_role == 'Admin':
+        if user_role == 'admin':
             return True
             
         # Managers are not allowed to update
-        if user_role == 'Manager':
+        if user_role == 'manager':
             return False 
         
         # Owner check: Must own the company associated with the station
-        if user_role == 'Owner':
+        if user_role == 'owner':
             inventory = self.get_object() # Fetches the Inventory item being updated
             try:
                 current_user = User.objects.get(pk=user_id)
@@ -824,11 +838,7 @@ class SystemSettingDeleteView(DeleteView):
         messages.success(self.request, 'Fuel type deleted successfully!')
         return super().delete(request, *args, **kwargs)
     from django.views.generic import TemplateView
-from django.shortcuts import redirect
-from django.urls import reverse_lazy
-from django.db import transaction
-from django.contrib import messages
-from .models import SystemSetting, Company, Station, User, Inventory
+
 
 class SettingsView(TemplateView):
     template_name = "settings/list.html"
@@ -849,21 +859,30 @@ class SettingsView(TemplateView):
         return user, user_role
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        user, user_role = self.get_user_data()
+     context = super().get_context_data(**kwargs)
+     user, user_role = self.get_user_data()
 
-        context['user_role'] = user_role
-        context['fuel_settings'] = SystemSetting.objects.all().order_by('fuel_type')
-        
-        # Filtering for Admin/Owner access panels
-        if user_role == 'admin':
-            context['all_companies'] = Company.objects.all().order_by('name')
-        elif user_role == 'owner':
-            # Get the company(ies) owned by this user
-            context['owner_companies'] = Company.objects.filter(owner=user).order_by('name')
+     # --- DEBUG LINES START ---
+     print(f"DEBUG: Current User ID: {self.request.session.get('user_id')}")
+     print(f"DEBUG: Role from session: {user_role}")
 
-        return context
+     # NOTE: You need to import Company model at the top of the file
+     # from .models import Company 
 
+     if user_role == 'admin':
+        all_companies_qs = Company.objects.all().order_by('name')
+        print(f"DEBUG: Admin found {all_companies_qs.count()} companies.")
+        context['all_companies'] = all_companies_qs
+     elif user_role == 'owner':
+        owner_companies_qs = Company.objects.filter(owner=user).order_by('name')
+        print(f"DEBUG: Owner found {owner_companies_qs.count()} companies.")
+        context['owner_companies'] = owner_companies_qs
+
+    # --- DEBUG LINES END ---
+
+     context['user_role'] = user_role
+    # ... rest of your code ...
+     return context
     @transaction.atomic
     def post(self, request, *args, **kwargs):
         user, user_role = self.get_user_data()

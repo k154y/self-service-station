@@ -29,6 +29,7 @@ urlpatterns = [
     
     # Pump CRUD
     path('pumps/', views.PumpListView.as_view(), name='pump_list'),
+    path('admin-tools/pumps/', views.AdminPumpListView.as_view(), name='admin_pump_list'),
     path('pumps/create/', views.PumpCreateView.as_view(), name='pump_create'),
     path('pumps/<int:pump_id>/update/', views.PumpUpdateView.as_view(), name='pump_update'),
     path('pumps/<int:pump_id>/status/', views.pump_status_update, name='pump_status_update'),
