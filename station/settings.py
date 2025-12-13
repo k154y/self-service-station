@@ -39,8 +39,24 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.humanize",
     "service",
-    "widget_tweaks"
+    "widget_tweaks",
+    "rest_framework",
+    "api",  
+    
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        # Use SessionAuthentication for browser-based testing/frontends (like React on the same server)
+        'rest_framework.authentication.SessionAuthentication', 
+        # Or use TokenAuthentication for mobile/external apps (requires token setup)
+        # 'rest_framework.authentication.TokenAuthentication', 
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        # Start with a strong default permission
+        'rest_framework.permissions.IsAuthenticated',
+    ]
+}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

@@ -358,6 +358,8 @@ class StationListView(ListView):
         user_role = self.request.session.get('role')
         return get_user_stations(user_id, user_role)
 
+# ... (inside views.py)
+
 class StationCreateView(CreateView):
     model = Station
     template_name = "stations/form.html"
@@ -365,8 +367,31 @@ class StationCreateView(CreateView):
     success_url = reverse_lazy('station_list')
     
     def form_valid(self, form):
+        manager = form.cleaned_data.get('manager_id')
+        new_company = form.cleaned_data.get('company_id')
+
+        if manager and manager.role == 'manager':
+            # Check if this manager already manages stations
+            existing_stations = Station.objects.filter(manager_id=manager).exclude(pk=self.object.pk if self.object else None)
+            
+            if existing_stations.exists():
+                # Get the company of the manager's existing station(s)
+                # We can assume all existing stations for this manager are under the same company
+                # based on the model's design intention (one manager per station)
+                existing_company = existing_stations.first().company_id
+                
+                if existing_company != new_company:
+                    # BLOCK THE ACTION
+                    messages.error(
+                        self.request, 
+                        f'Manager {manager.username} already manages a station for company "{existing_company.name}". They cannot be assigned to a station under "{new_company.name}".'
+                    )
+                    return self.form_invalid(form) # Return to the form with error
+
         messages.success(self.request, 'Station created successfully!')
-        return super().form_valid(form)
+        return super().form_valid(form) # Save the form if validation passes
+    
+# ... (inside views.py)
 
 class StationUpdateView(UpdateView):
     model = Station
@@ -376,8 +401,27 @@ class StationUpdateView(UpdateView):
     pk_url_kwarg = 'station_id'
     
     def form_valid(self, form):
+        manager = form.cleaned_data.get('manager_id')
+        updated_company = form.cleaned_data.get('company_id')
+
+        if manager and manager.role == 'manager':
+            # Check if this manager already manages stations
+            # IMPORTANT: Exclude the *current* station object being updated (self.object)
+            existing_stations = Station.objects.filter(manager_id=manager).exclude(pk=self.object.pk)
+            
+            if existing_stations.exists():
+                existing_company = existing_stations.first().company_id
+                
+                if existing_company != updated_company:
+                    # BLOCK THE ACTION
+                    messages.error(
+                        self.request, 
+                        f'Manager {manager.username} already manages a station for company "{existing_company.name}". They cannot be assigned to a station under "{updated_company.name}".'
+                    )
+                    return self.form_invalid(form) # Return to the form with error
+
         messages.success(self.request, 'Station updated successfully!')
-        return super().form_valid(form)
+        return super().form_valid(form) # Save the form if validation passes
 
 class StationDeleteView(DeleteView):
     model = Station
