@@ -1,5 +1,7 @@
 from rest_framework.routers import DefaultRouter
 from django.urls import path, include
+
+# 1. UPDATED: Import the CustomObtainAuthToken view
 from .views import (
     # Core Entities
     UserViewSet, 
@@ -15,6 +17,9 @@ from .views import (
     # Alerts and Settings
     AlertViewSet,
     # SystemSettingViewSet 
+
+    # --- ADDED: The Custom Token View ---
+    CustomObtainAuthToken,
 )
 
 router = DefaultRouter()
@@ -40,13 +45,21 @@ urlpatterns = [
     path('', include(router.urls)),
 
     # Custom Endpoint: Transaction Creation (High-traffic, complex business logic)
-    # The dedicated URL allows the mobile app to easily POST sales data.
     path(
         'transactions/create/',
         TransactionCreateAPIView.as_view({'post': 'create'}),
         name='transaction-create'
     ),
+    
+    # --- ADDED: Custom Token Authentication URL ---
+    # This path is now handled by your custom view which uses the 'email' field for login.
+    path(
+        'auth/token/', 
+        CustomObtainAuthToken.as_view(), 
+        name='api-token-auth'
+    ),
 
-    # Optional: DRF login/logout views (Useful for API testing and browser access)
-    path('auth/', include('rest_framework.urls', namespace='rest_framework')),
+    # NOTE: The default path below is REMOVED to prevent the CSRF error.
+    # path('auth/', include('rest_framework.urls', namespace='rest_framework')), 
+    # Use the /auth/token/ endpoint above instead of the session login views.
 ]

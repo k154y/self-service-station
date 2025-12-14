@@ -212,12 +212,66 @@ def get_user_stations(user_id, user_role):
         return Station.objects.filter(manager_id=user)
 
     return Station.objects.none()
+# In service/views.py
+
+class UserProfileView(CustomLoginRequiredMixin, TemplateView):
+    template_name = "users/profile.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # 1. Fetch the current logged-in user
+        user_id = self.request.session.get('user_id')
+        user = get_object_or_404(User, user_id=user_id)
+        context['profile_user'] = user
+
+        # 2. Fetch Contextual Data based on Role
+        if user.role == 'owner':
+            # If Owner: Fetch all companies they own
+            companies = Company.objects.filter(owner=user)
+            context['companies'] = companies
+            context['companies_count'] = companies.count()
+
+        elif user.role == 'manager':
+            # If Manager: Fetch the station they are assigned to
+            # (Note: Using filter().first() prevents crashes if they aren't assigned yet)
+            station = Station.objects.filter(manager_id=user).first()
+            context['station'] = station
+            if station:
+                context['company'] = station.company_id
+        
+        # Admin doesn't need specific extra context (they see everything)
+        
+        return context
 
 # USER CRUD (Class-Based Views) 
 class UserListView(ListView):
     model = User
     template_name = "users/list.html"
     context_object_name = "users"
+    
+    def get_queryset(self):
+        user_id = self.request.session.get('user_id')
+        user_role = self.request.session.get('role')
+        
+        if user_role == 'admin':
+            # Admin sees all users
+            return User.objects.all()
+        elif user_role == 'owner':
+            # Owner sees only users related to their companies (managers of their stations)
+            try:
+                owner = User.objects.get(user_id=user_id)
+                # Get stations owned by this owner
+                owned_stations = Station.objects.filter(company_id__owner=owner)
+                # Get managers of those stations
+                manager_ids = owned_stations.values_list('manager_id', flat=True).distinct()
+                # Include the owner themselves and the managers
+                return User.objects.filter(Q(user_id=owner.user_id) | Q(user_id__in=manager_ids))
+            except User.DoesNotExist:
+                return User.objects.none()
+        else:
+            # Managers see only themselves
+            return User.objects.filter(user_id=user_id)
 
 # class UserCreateView(CreateView):
 #     model = User
@@ -296,6 +350,31 @@ class UserUpdateView(UpdateView):
     success_url = reverse_lazy('user_list')
     pk_url_kwarg = 'user_id'
     
+    def dispatch(self, request, *args, **kwargs):
+        # Get the user being updated
+        user_to_update = self.get_object()
+        current_user_role = request.session.get('role')
+        
+        # Prevent non-admins from editing admins
+        if user_to_update.role == 'admin' and current_user_role != 'admin':
+            messages.error(request, 'You do not have permission to edit admin users.')
+            return redirect('user_list')
+        
+        # Additional checks for owners: can only edit users in their companies
+        if current_user_role == 'owner':
+            try:
+                owner = User.objects.get(user_id=request.session.get('user_id'))
+                # Check if the user to update is a manager of the owner's stations
+                owned_stations = Station.objects.filter(company_id__owner=owner)
+                if user_to_update not in owned_stations.values_list('manager_id', flat=True) and user_to_update != owner:
+                    messages.error(request, 'You can only edit users related to your companies.')
+                    return redirect('user_list')
+            except User.DoesNotExist:
+                messages.error(request, 'User not found.')
+                return redirect('user_list')
+        
+        return super().dispatch(request, *args, **kwargs)
+    
     def form_valid(self, form):
         messages.success(self.request, 'User updated successfully!')
         return super().form_valid(form)
@@ -305,6 +384,31 @@ class UserDeleteView(DeleteView):
     template_name = "users/delete.html"
     success_url = reverse_lazy('user_list')
     pk_url_kwarg = 'user_id'
+    
+    def dispatch(self, request, *args, **kwargs):
+        # Get the user being deleted
+        user_to_delete = self.get_object()
+        current_user_role = self.request.session.get('role')
+        
+        # Prevent non-admins from deleting admins
+        if user_to_delete.role == 'admin' and current_user_role != 'admin':
+            messages.error(self.request, 'You do not have permission to delete admin users.')
+            return redirect('user_list')
+        
+        # Additional checks for owners: can only delete users in their companies
+        if current_user_role == 'owner':
+            try:
+                owner = User.objects.get(user_id=self.request.session.get('user_id'))
+                # Check if the user to delete is a manager of the owner's stations
+                owned_stations = Station.objects.filter(company_id__owner=owner)
+                if user_to_delete.user_id not in owned_stations.values_list('manager_id', flat=True) and user_to_delete != owner:
+                    messages.error(self.request, 'You can only delete users related to your companies.')
+                    return redirect('user_list')
+            except User.DoesNotExist:
+                messages.error(self.request, 'User not found.')
+                return redirect('user_list')
+        
+        return super().dispatch(self, *args, **kwargs)
     
     def delete(self, request, *args, **kwargs):
         messages.success(self.request, 'User deleted successfully!')
@@ -358,40 +462,77 @@ class StationListView(ListView):
         user_role = self.request.session.get('role')
         return get_user_stations(user_id, user_role)
 
-# ... (inside views.py)
-
 class StationCreateView(CreateView):
     model = Station
     template_name = "stations/form.html"
     fields = ["company_id", "manager_id", "name", "location", "status"]
     success_url = reverse_lazy('station_list')
     
+    def dispatch(self, request, *args, **kwargs):
+        user_role = request.session.get('role')
+        if user_role not in ['admin', 'owner']:
+            messages.error(request, "You do not have permission to create stations.")
+            return redirect('station_list')
+        return super().dispatch(request, *args, **kwargs)
+    
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        user_id = self.request.session.get('user_id')
+        user_role = self.request.session.get('role')
+        
+        if user_role == 'owner':
+            try:
+                user = User.objects.get(user_id=user_id)
+                form.fields['company_id'].queryset = Company.objects.filter(owner=user)
+            except User.DoesNotExist:
+                form.fields['company_id'].queryset = Company.objects.none()
+        # Admin sees all companies by default
+        
+        return form
+    
     def form_valid(self, form):
+        company = form.cleaned_data.get('company_id')
         manager = form.cleaned_data.get('manager_id')
-        new_company = form.cleaned_data.get('company_id')
+        station_name = form.cleaned_data.get('name')
+        user_id = self.request.session.get('user_id')
+        user_role = self.request.session.get('role')
 
+        # 1. Check if station name already exists
+        if Station.objects.filter(name=station_name).exists():
+            messages.error(self.request, f'A station with the name "{station_name}" already exists. Please use a unique name.')
+            return self.form_invalid(form)
+
+        # 2. Check if manager is an owner trying to manage a station outside their company
+        if manager and manager.role == 'owner':
+            try:
+                manager_user = User.objects.get(user_id=manager.user_id)
+                # Owner can only manage stations for companies they own
+                if manager_user != company.owner:
+                    messages.error(
+                        self.request,
+                        f'Owner "{manager.username}" can only manage stations for companies they own. They do not own "{company.name}".'
+                    )
+                    return self.form_invalid(form)
+            except User.DoesNotExist:
+                messages.error(self.request, 'Manager user not found.')
+                return self.form_invalid(form)
+
+        # 3. Check if manager (manager role) already manages stations in a different company
         if manager and manager.role == 'manager':
-            # Check if this manager already manages stations
             existing_stations = Station.objects.filter(manager_id=manager).exclude(pk=self.object.pk if self.object else None)
             
             if existing_stations.exists():
-                # Get the company of the manager's existing station(s)
-                # We can assume all existing stations for this manager are under the same company
-                # based on the model's design intention (one manager per station)
                 existing_company = existing_stations.first().company_id
                 
-                if existing_company != new_company:
-                    # BLOCK THE ACTION
+                if existing_company != company:
                     messages.error(
-                        self.request, 
-                        f'Manager {manager.username} already manages a station for company "{existing_company.name}". They cannot be assigned to a station under "{new_company.name}".'
+                        self.request,
+                        f'Manager "{manager.username}" already manages a station for company "{existing_company.name}". They cannot be assigned to a station under "{company.name}".'
                     )
-                    return self.form_invalid(form) # Return to the form with error
+                    return self.form_invalid(form)
 
         messages.success(self.request, 'Station created successfully!')
-        return super().form_valid(form) # Save the form if validation passes
-    
-# ... (inside views.py)
+        return super().form_valid(form)
 
 class StationUpdateView(UpdateView):
     model = Station
@@ -400,28 +541,86 @@ class StationUpdateView(UpdateView):
     success_url = reverse_lazy('station_list')
     pk_url_kwarg = 'station_id'
     
+    def dispatch(self, request, *args, **kwargs):
+        user_role = request.session.get('role')
+        if user_role not in ['admin', 'owner']:
+            messages.error(request, "You do not have permission to update stations.")
+            return redirect('station_list')
+        
+        # Check if the station belongs to the user's companies
+        station = self.get_object()
+        user_id = request.session.get('user_id')
+        if user_role == 'owner':
+            try:
+                user = User.objects.get(user_id=user_id)
+                if station.company_id.owner != user:
+                    messages.error(request, "You can only update stations in your companies.")
+                    return redirect('station_list')
+            except User.DoesNotExist:
+                messages.error(request, "User not found.")
+                return redirect('station_list')
+        # Admin can update any
+        
+        return super().dispatch(request, *args, **kwargs)
+    
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        user_id = self.request.session.get('user_id')
+        user_role = self.request.session.get('role')
+        
+        if user_role == 'owner':
+            try:
+                user = User.objects.get(user_id=user_id)
+                form.fields['company_id'].queryset = Company.objects.filter(owner=user)
+            except User.DoesNotExist:
+                form.fields['company_id'].queryset = Company.objects.none()
+        # Admin sees all companies by default
+        
+        return form
+    
     def form_valid(self, form):
+        company = form.cleaned_data.get('company_id')
         manager = form.cleaned_data.get('manager_id')
-        updated_company = form.cleaned_data.get('company_id')
+        station_name = form.cleaned_data.get('name')
+        user_id = self.request.session.get('user_id')
+        user_role = self.request.session.get('role')
 
+        # 1. Check if station name already exists (exclude current station)
+        if Station.objects.filter(name=station_name).exclude(pk=self.object.pk).exists():
+            messages.error(self.request, f'A station with the name "{station_name}" already exists. Please use a unique name.')
+            return self.form_invalid(form)
+
+        # 2. Check if manager is an owner trying to manage a station outside their company
+        if manager and manager.role == 'owner':
+            try:
+                manager_user = User.objects.get(user_id=manager.user_id)
+                # Owner can only manage stations for companies they own
+                if manager_user != company.owner:
+                    messages.error(
+                        self.request,
+                        f'Owner "{manager.username}" can only manage stations for companies they own. They do not own "{company.name}".'
+                    )
+                    return self.form_invalid(form)
+            except User.DoesNotExist:
+                messages.error(self.request, 'Manager user not found.')
+                return self.form_invalid(form)
+
+        # 3. Check if manager (manager role) already manages stations in a different company
         if manager and manager.role == 'manager':
-            # Check if this manager already manages stations
-            # IMPORTANT: Exclude the *current* station object being updated (self.object)
             existing_stations = Station.objects.filter(manager_id=manager).exclude(pk=self.object.pk)
             
             if existing_stations.exists():
                 existing_company = existing_stations.first().company_id
                 
-                if existing_company != updated_company:
-                    # BLOCK THE ACTION
+                if existing_company != company:
                     messages.error(
-                        self.request, 
-                        f'Manager {manager.username} already manages a station for company "{existing_company.name}". They cannot be assigned to a station under "{updated_company.name}".'
+                        self.request,
+                        f'Manager "{manager.username}" already manages a station for company "{existing_company.name}". They cannot be assigned to a station under "{company.name}".'
                     )
-                    return self.form_invalid(form) # Return to the form with error
+                    return self.form_invalid(form)
 
         messages.success(self.request, 'Station updated successfully!')
-        return super().form_valid(form) # Save the form if validation passes
+        return super().form_valid(form)
 
 class StationDeleteView(DeleteView):
     model = Station
@@ -458,24 +657,85 @@ class AdminPumpListView(PumpListView):
         # We still need the pumps queryset which is handled by get_queryset
         return context
 
-class PumpCreateView(CreateView):
+class PumpCreateView(CustomLoginRequiredMixin, CreateView):
     model = Pump
     template_name = "pumps/form.html"
     fields = ["station", "pump_number", "fuel_type", "status", "flow_rate"]
     success_url = reverse_lazy('pump_list')
-    
+
+    def dispatch(self, request, *args, **kwargs):
+        # Ensure user has permission to create pumps
+        user_role = request.session.get('role')
+        if user_role not in ['admin', 'owner']:
+            messages.error(request, "You do not have permission to create pumps.")
+            return redirect('pump_list')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        user_id = self.request.session.get('user_id')
+        user_role = self.request.session.get('role')
+        stations = get_user_stations(user_id, user_role)
+        form.fields['station'].queryset = stations
+        return form
+
     def form_valid(self, form):
+        # Additional check: ensure the station belongs to the user (for owner)
+        user_role = self.request.session.get('role')
+        if user_role == 'owner':
+            station = form.cleaned_data.get('station')
+            user_id = self.request.session.get('user_id')
+            try:
+                user = User.objects.get(user_id=user_id)
+                if station.company_id.owner != user:
+                    messages.error(self.request, "You can only add pumps to stations in your companies.")
+                    return self.form_invalid(form)
+            except User.DoesNotExist:
+                messages.error(self.request, "User not found.")
+                return self.form_invalid(form)
         messages.success(self.request, 'Pump created successfully!')
         return super().form_valid(form)
 
-class PumpUpdateView(UpdateView):
+class PumpUpdateView(CustomLoginRequiredMixin, UpdateView):
     model = Pump
     template_name = "pumps/form.html"
     fields = ["station", "pump_number", "fuel_type", "status", "flow_rate"]
     success_url = reverse_lazy('pump_list')
     pk_url_kwarg = 'pump_id'
-    
+
+    def dispatch(self, request, *args, **kwargs):
+        # Check if user can access this pump
+        pump = self.get_object()
+        user_id = self.request.session.get('user_id')
+        user_role = self.request.session.get('role')
+        stations = get_user_stations(user_id, user_role)
+        if pump.station not in stations:
+            messages.error(self.request, "You do not have permission to edit this pump.")
+            return redirect('pump_list')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        user_id = self.request.session.get('user_id')
+        user_role = self.request.session.get('role')
+        stations = get_user_stations(user_id, user_role)
+        form.fields['station'].queryset = stations
+        return form
+
     def form_valid(self, form):
+        # Additional check for owner: ensure station belongs to them
+        user_role = self.request.session.get('role')
+        if user_role == 'owner':
+            station = form.cleaned_data.get('station')
+            user_id = self.request.session.get('user_id')
+            try:
+                user = User.objects.get(user_id=user_id)
+                if station.company_id.owner != user:
+                    messages.error(self.request, "You can only edit pumps for stations in your companies.")
+                    return self.form_invalid(form)
+            except User.DoesNotExist:
+                messages.error(self.request, "User not found.")
+                return self.form_invalid(form)
         messages.success(self.request, 'Pump updated successfully!')
         return super().form_valid(form)
 
@@ -965,3 +1225,38 @@ class SettingsView(TemplateView):
         # Future actions like 'add_company', 'add_manager', 'add_station' would go here...
 
         return redirect(reverse_lazy('settings_list')) # Redirect back to the settings page
+
+
+# ========== USER PROFILE VIEW ==========
+class UserProfileView(UpdateView):
+    model = User
+    template_name = "users/profile.html"
+    fields = ["username", "full_name", "email"]
+    success_url = reverse_lazy('dashboard')
+    context_object_name = 'profile_user'
+    
+    def get_object(self):
+        # Get the current logged-in user
+        user_id = self.request.session.get('user_id')
+        return get_object_or_404(User, user_id=user_id)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.get_object()
+        
+        if user.role == 'owner':
+            companies = Company.objects.filter(owner=user)
+            context['companies'] = companies
+            context['companies_count'] = companies.count()
+        elif user.role == 'manager':
+            # Assuming manager has a station
+            station = Station.objects.filter(manager_id=user).first()
+            if station:
+                context['station'] = station
+                context['company'] = station.company_id
+        
+        return context
+    
+    def form_valid(self, form):
+        messages.success(self.request, 'Profile updated successfully!')
+        return super().form_valid(form)

@@ -1,6 +1,6 @@
 # C:\Users\k.yves\Desktop\self_service_station\api\views.py
 
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, serializers
 from rest_framework.response import Response
 from rest_framework.permissions import BasePermission
 from rest_framework.decorators import action
@@ -16,6 +16,50 @@ from .serializers import (
     PumpSerializer, InventorySerializer, TransactionSerializer, 
     TransactionCreateSerializer, AlertSerializer
 )
+
+
+from rest_framework.authentication import SessionAuthentication
+
+from rest_framework.authtoken.views import ObtainAuthToken
+from .serializers import (
+    # ... your existing imports
+    CustomAuthTokenSerializer # <-- Import the new serializer
+)
+
+# ... (rest of your existing views.py file)
+
+# --- CUSTOM TOKEN VIEW (Add this at the end of views.py) ---
+class CustomObtainAuthToken(ObtainAuthToken):
+    """
+    Custom view that uses CustomAuthTokenSerializer for email login.
+    """
+    serializer_class = CustomAuthTokenSerializer
+
+class CustomSessionAuthentication(SessionAuthentication):
+    """
+    Use this to allow DRF to recognize a user authenticated 
+    via your custom session-based login.
+    """
+    def authenticate(self, request):
+        # Your custom login puts user_id in the session.
+        user_id = request.session.get('user_id')
+        
+        if user_id:
+            # If a user is identified by your session, load the User object.
+            # You must ensure the 'User' model is imported.
+            try:
+                from service.models import User
+                user = User.objects.get(user_id=user_id)
+                # DRF requires (user, auth) tuple
+                return (user, None)
+            except User.DoesNotExist:
+                return None
+        return None
+
+
+
+# ...
+
 
 # --- Custom Permissions Class (Completed) ---
 
@@ -80,6 +124,7 @@ class HasCompanyAccess(BasePermission):
 class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [HasCompanyAccess]
+    authentication_classes = [CustomSessionAuthentication]
     
     def get_queryset(self):
         user_role = self.request.session.get('role')
@@ -130,6 +175,7 @@ class UserViewSet(viewsets.ModelViewSet):
 class CompanyViewSet(viewsets.ModelViewSet):
     serializer_class = CompanySerializer
     permission_classes = [HasCompanyAccess]
+    authentication_classes = [CustomSessionAuthentication]
     
     def get_queryset(self):
         user_id = self.request.session.get('user_id')
@@ -151,7 +197,7 @@ class CompanyViewSet(viewsets.ModelViewSet):
 class StationViewSet(viewsets.ModelViewSet):
     serializer_class = StationSerializer
     permission_classes = [HasCompanyAccess]
-    
+    authentication_classes = [CustomSessionAuthentication]
     def get_queryset(self):
         # Uses the helper function to filter stations by user role/access
         user_id = self.request.session.get('user_id')
@@ -162,6 +208,13 @@ class StationViewSet(viewsets.ModelViewSet):
         """Helper to enforce the Manager-per-Company rule on create and update."""
         manager_id = serializer.validated_data.get('manager_id')
         company_id = serializer.validated_data.get('company_id')
+
+        if manager_id and manager_id.role == 'owner':
+            # Owners can only manage stations for companies they own
+            if manager_id != company_id.owner:
+                raise serializers.ValidationError(
+                    f'Owner "{manager_id.username}" can only manage stations for companies they own. They do not own "{company_id.name}".'
+                )
 
         if manager_id and manager_id.role == 'manager':
             # Find stations this manager already manages, excluding the current station if updating
@@ -210,6 +263,7 @@ class StationViewSet(viewsets.ModelViewSet):
 class PumpViewSet(viewsets.ModelViewSet):
     serializer_class = PumpSerializer
     permission_classes = [HasCompanyAccess]
+    authentication_classes = [CustomSessionAuthentication]
     
     def get_queryset(self):
         user_id = self.request.session.get('user_id')
@@ -241,6 +295,7 @@ class PumpViewSet(viewsets.ModelViewSet):
 class InventoryViewSet(viewsets.ModelViewSet):
     serializer_class = InventorySerializer
     permission_classes = [HasCompanyAccess]
+    authentication_classes = [CustomSessionAuthentication]
     
     def get_queryset(self):
         user_id = self.request.session.get('user_id')
@@ -289,6 +344,7 @@ class InventoryViewSet(viewsets.ModelViewSet):
 class TransactionListViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = TransactionSerializer
     permission_classes = [HasCompanyAccess]
+    authentication_classes = [CustomSessionAuthentication]
 
     def get_queryset(self):
         user_id = self.request.session.get('user_id')
@@ -335,6 +391,7 @@ class TransactionListViewSet(viewsets.ReadOnlyModelViewSet):
 class TransactionCreateAPIView(viewsets.GenericViewSet, viewsets.mixins.CreateModelMixin):
     serializer_class = TransactionCreateSerializer
     permission_classes = [HasCompanyAccess] 
+    authentication_classes = [CustomSessionAuthentication]
     
     def perform_create(self, serializer):
         # NOTE: This is where you would integrate the complex logic from 
