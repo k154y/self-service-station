@@ -930,16 +930,6 @@ class InventoryListView(ListView):
         
         return inventory
 
-class InventoryUpdateView(UpdateView):
-    model = Inventory
-    template_name = "inventory/form.html"
-    fields = ["quantity", "unit_price", "min_threshold"]
-    success_url = reverse_lazy('inventory_list')
-    pk_url_kwarg = 'inventory_id'
-    
-    def form_valid(self, form):
-        messages.success(self.request, 'Inventory updated successfully!')
-        return super().form_valid(form)
 
 class InventoryAccessMixin(UserPassesTestMixin):
     """Ensures the user is logged in before accessing inventory pages."""
