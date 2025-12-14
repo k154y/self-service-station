@@ -52,6 +52,15 @@ class InventoryUpdateForm(forms.ModelForm):
     class Meta:
         model = Inventory
         fields = ['quantity', 'unit_price', 'min_threshold']
+    
+    def clean_quantity(self):
+        quantity = self.cleaned_data.get('quantity')
+        if self.instance and self.instance.capacity:
+            if quantity > self.instance.capacity:
+                raise forms.ValidationError(
+                    f'Quantity ({quantity}L) cannot exceed capacity ({self.instance.capacity}L).'
+                )
+        return quantity
 
 class TransactionForm(forms.ModelForm):
     class Meta:

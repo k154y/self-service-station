@@ -127,14 +127,15 @@ def forgot_password(request):
             # Send email with reset link
             from django.core.mail import send_mail
             from django.urls import reverse
+            from django.conf import settings
+            
             reset_url = request.build_absolute_uri(
                 reverse('reset_password', args=[reset_token.token])
             )
             
-            try:
-                send_mail(
-                    subject='Password Reset Request - Fuel Station',
-                    message=f'''
+            # Prepare email content
+            subject = 'Password Reset Request - Fuel Station'
+            message = f'''
 Hello {user.full_name},
 
 You requested to reset your password for your Fuel Station account.
@@ -148,16 +149,31 @@ If you did not request this password reset, please ignore this email.
 
 Best regards,
 Fuel Station Team
-                    ''',
-                    from_email=None,  # Uses DEFAULT_FROM_EMAIL from settings
+            '''
+            
+            from_email = settings.DEFAULT_FROM_EMAIL or 'noreply@fuelstation.com'
+            
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=from_email,
                     recipient_list=[user.email],
                     fail_silently=False,
                 )
-                messages.success(request, 'Password reset link has been sent to your email address.')
+                messages.success(request, f'Password reset link has been sent to {user.email}. Please check your email.')
             except Exception as e:
-                # If email sending fails, still show success message for security
-                # In production, log the error
-                messages.success(request, 'If an account exists with this email, a password reset link has been sent.')
+                # Log the error for debugging
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f'Failed to send password reset email: {str(e)}')
+                
+                # For development: show the reset URL in a message if email fails
+                if settings.DEBUG:
+                    messages.info(request, f'Email sending failed (check email settings). Reset URL: {reset_url}')
+                else:
+                    # In production, don't reveal if email exists or not (security)
+                    messages.success(request, 'If an account exists with this email, a password reset link has been sent.')
             
             return redirect('landing_page')
         except User.DoesNotExist:
@@ -417,14 +433,20 @@ class UserCreateView(CustomLoginRequiredMixin, CreateView):
         selected_role = form.cleaned_data['role']
 
         # Double check permission on submit
-        if current_user_role == "owner" and selected_role != "manager":
-            messages.error(self.request, "Owners can only create Managers.")
-            return redirect("user_list")
+        if current_user_role == "owner":
+            if selected_role != "manager":
+                messages.error(self.request, "Owners can only create Managers.")
+                return redirect("user_list")
+            # Prevent owner from creating admin users
+            if selected_role == "admin":
+                messages.error(self.request, "Owners cannot create admin users.")
+                return redirect("user_list")
 
         user = form.save(commit=False)
-        # Note: Since you are using a custom model, ensure your save logic 
-        # handles password hashing if you aren't using Django's AbstractBaseUser.
-        # If storing plain text (not recommended): user.password = form.cleaned_data['password']
+        # Hash password if provided
+        if 'password' in form.cleaned_data and form.cleaned_data['password']:
+            from django.contrib.auth.hashers import make_password
+            user.password = make_password(form.cleaned_data['password'])
         user.save()
 
         messages.success(self.request, "User created successfully!")
@@ -462,7 +484,34 @@ class UserUpdateView(UpdateView):
         
         return super().dispatch(request, *args, **kwargs)
     
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        current_user_role = self.request.session.get('role')
+        
+        # Owner can only edit managers, not admins
+        if current_user_role == 'owner':
+            form.fields['role'].choices = [
+                ('manager', 'Manager'),
+            ]
+            # Prevent editing password for owners (optional - you can remove this if needed)
+            # form.fields['password'].widget = forms.HiddenInput()
+        
+        return form
+    
     def form_valid(self, form):
+        current_user_role = self.request.session.get('role')
+        selected_role = form.cleaned_data.get('role')
+        
+        # Prevent owner from assigning admin role
+        if current_user_role == 'owner' and selected_role == 'admin':
+            messages.error(self.request, 'Owners cannot assign admin role.')
+            return redirect('user_list')
+        
+        # Hash password if it was changed
+        if 'password' in form.cleaned_data and form.cleaned_data['password']:
+            from django.contrib.auth.hashers import make_password
+            form.instance.password = make_password(form.cleaned_data['password'])
+        
         messages.success(self.request, 'User updated successfully!')
         return super().form_valid(form)
 
@@ -495,7 +544,7 @@ class UserDeleteView(DeleteView):
                 messages.error(self.request, 'User not found.')
                 return redirect('user_list')
         
-        return super().dispatch(self, *args, **kwargs)
+        return super().dispatch(request, *args, **kwargs)
     
     def delete(self, request, *args, **kwargs):
         messages.success(self.request, 'User deleted successfully!')
@@ -658,10 +707,20 @@ class StationUpdateView(UpdateView):
         if user_role == 'owner':
             try:
                 user = User.objects.get(user_id=user_id)
+                # Owner can only select their own companies
                 form.fields['company_id'].queryset = Company.objects.filter(owner=user)
+                # Owner can only select managers they created (under their companies)
+                owned_stations = Station.objects.filter(company_id__owner=user)
+                manager_ids = owned_stations.values_list('manager_id', flat=True).distinct()
+                # Only show managers (not admins) that belong to owner's companies
+                form.fields['manager_id'].queryset = User.objects.filter(
+                    user_id__in=manager_ids, 
+                    role='manager'
+                )
             except User.DoesNotExist:
                 form.fields['company_id'].queryset = Company.objects.none()
-        # Admin sees all companies by default
+                form.fields['manager_id'].queryset = User.objects.none()
+        # Admin sees all companies and all users by default
         
         return form
     

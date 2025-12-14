@@ -373,6 +373,19 @@ class InventoryViewSet(viewsets.ModelViewSet):
                             status=status.HTTP_403_FORBIDDEN)
                             
         instance = self.get_object()
+        new_quantity = request.data.get('quantity')
+        
+        # Validate quantity doesn't exceed capacity
+        if new_quantity is not None:
+            try:
+                new_quantity = float(new_quantity)
+                if new_quantity > instance.capacity:
+                    return Response({
+                        'detail': f'Quantity ({new_quantity}L) cannot exceed capacity ({instance.capacity}L).'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            except (ValueError, TypeError):
+                return Response({'detail': 'Invalid quantity value.'}, status=status.HTTP_400_BAD_REQUEST)
+        
         data = {
             # Only allow update for these specific fields, matching InventoryUpdateForm
             'quantity': request.data.get('quantity'),
@@ -382,7 +395,42 @@ class InventoryViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(instance, data=data, partial=True)
         serializer.is_valid(raise_exception=True)
+        
+        # Get old quantity before update
+        old_quantity = instance.quantity
+        
+        # Perform update
         self.perform_update(serializer)
+        
+        # Refresh instance to get updated values
+        instance.refresh_from_db()
+        
+        # Handle alerts based on quantity vs min_threshold
+        if instance.quantity <= instance.min_threshold:
+            # Quantity is at or below threshold - create or update alert
+            from service.models import Alert
+            alert, created = Alert.objects.get_or_create(
+                inventory_id=instance,
+                status='pending',
+                defaults={
+                    'station': instance.station_id,
+                    'type': 'inventory',
+                    'description': f'Low inventory alert: {instance.fuel_type} at {instance.station_id.name} is at {instance.quantity}L, which is below the minimum threshold of {instance.min_threshold}L.',
+                }
+            )
+            if not created:
+                # Update existing alert if quantity changed
+                alert.description = f'Low inventory alert: {instance.fuel_type} at {instance.station_id.name} is at {instance.quantity}L, which is below the minimum threshold of {instance.min_threshold}L.'
+                alert.status = 'pending'  # Reset to pending if it was resolved
+                alert.save()
+        else:
+            # Quantity is above threshold - resolve any existing alerts for this inventory
+            from service.models import Alert
+            Alert.objects.filter(
+                inventory_id=instance,
+                type='inventory',
+                status='pending'
+            ).update(status='resolved')
 
         return Response(serializer.data)
 
