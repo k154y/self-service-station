@@ -920,11 +920,14 @@ class InventoryListView(ListView):
         
         # Calculate percentages
         for item in inventory:
-            item.percentage = (item.quantity / item.capacity) * 100
-            if item.percentage >= 75:
+            if item.capacity and item.capacity > 0:
+                item.percentage = (item.quantity / item.capacity) * 100
+            else:
+                item.percentage = 0
+            
+            # Status based on percentage: Above 25% = Good, 25% and below = Low
+            if item.percentage > 25:
                 item.status = 'Good'
-            elif item.percentage >= 50:
-                item.status = 'Medium'
             else:
                 item.status = 'Low'
         
