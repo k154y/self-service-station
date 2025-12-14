@@ -1023,8 +1023,47 @@ class InventoryUpdateView(InventoryAccessMixin, UpdateView):
         return False
 
     def form_valid(self, form):
+        inventory = form.save(commit=False)
+        
+        # 1. Validate quantity doesn't exceed capacity
+        if inventory.quantity > inventory.capacity:
+            messages.error(self.request, f'Quantity ({inventory.quantity}L) cannot exceed capacity ({inventory.capacity}L).')
+            return self.form_invalid(form)
+        
+        # 2. Get old quantity before saving
+        old_quantity = self.get_object().quantity
+        new_quantity = inventory.quantity
+        
+        # Save the inventory first
+        inventory.save()
+        
+        # 3. Handle alerts based on quantity vs min_threshold
+        if new_quantity <= inventory.min_threshold:
+            # Quantity is at or below threshold - create or update alert
+            alert, created = Alert.objects.get_or_create(
+                inventory_id=inventory,
+                status='pending',
+                defaults={
+                    'station': inventory.station_id,
+                    'type': 'inventory',
+                    'description': f'Low inventory alert: {inventory.fuel_type} at {inventory.station_id.name} is at {new_quantity}L, which is below the minimum threshold of {inventory.min_threshold}L.',
+                }
+            )
+            if not created:
+                # Update existing alert if quantity changed
+                alert.description = f'Low inventory alert: {inventory.fuel_type} at {inventory.station_id.name} is at {new_quantity}L, which is below the minimum threshold of {inventory.min_threshold}L.'
+                alert.status = 'pending'  # Reset to pending if it was resolved
+                alert.save()
+        else:
+            # Quantity is above threshold - resolve any existing alerts for this inventory
+            Alert.objects.filter(
+                inventory_id=inventory,
+                type='inventory',
+                status='pending'
+            ).update(status='resolved')
+        
         messages.success(self.request, 'Inventory updated successfully!')
-        return super().form_valid(form)
+        return redirect(self.success_url)
 
 # ========== TRANSACTION CRUD ==========
 
