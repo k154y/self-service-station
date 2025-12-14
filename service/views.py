@@ -965,7 +965,11 @@ class InventoryListView(InventoryAccessMixin, ListView):
             else:
                 item.percentage = 0
             
-            # ... status calculation ...
+            # Status based on percentage: Above 25% = Good, 25% and below = Low
+            if item.percentage > 25:
+                item.status = 'Good'
+            else:
+                item.status = 'Low'
             
         return inventory
     def get_context_data(self, **kwargs):
