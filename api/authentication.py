@@ -1,4 +1,5 @@
-from rest_framework.authentication import SessionAuthentication # Import DRF's base class
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication, BaseAuthentication
+from rest_framework.authtoken.models import Token
 from service.models import User  # Import the User model
 
 class CustomSessionAuthentication(SessionAuthentication):
@@ -17,4 +18,26 @@ class CustomSessionAuthentication(SessionAuthentication):
                 return (user, None)
             except User.DoesNotExist:
                 return None
+        return None
+
+
+class HybridAuthentication(BaseAuthentication):
+    """
+    Hybrid authentication that supports both session-based and token-based authentication.
+    Tries token authentication first, then falls back to session authentication.
+    """
+    def authenticate(self, request):
+        # Try token authentication first
+        token_auth = TokenAuthentication()
+        token_result = token_auth.authenticate(request)
+        if token_result:
+            user, token = token_result
+            return token_result
+        
+        # Fall back to session authentication
+        session_auth = CustomSessionAuthentication()
+        session_result = session_auth.authenticate(request)
+        if session_result:
+            return session_result
+        
         return None

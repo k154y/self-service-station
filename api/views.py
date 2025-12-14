@@ -18,13 +18,12 @@ from .serializers import (
 )
 
 
-from rest_framework.authentication import SessionAuthentication
-
 from rest_framework.authtoken.views import ObtainAuthToken
 from .serializers import (
     # ... your existing imports
     CustomAuthTokenSerializer # <-- Import the new serializer
 )
+from .authentication import CustomSessionAuthentication, HybridAuthentication
 
 # ... (rest of your existing views.py file)
 
@@ -32,29 +31,26 @@ from .serializers import (
 class CustomObtainAuthToken(ObtainAuthToken):
     """
     Custom view that uses CustomAuthTokenSerializer for email login.
+    Also creates/updates session for web compatibility.
     """
     serializer_class = CustomAuthTokenSerializer
-
-class CustomSessionAuthentication(SessionAuthentication):
-    """
-    Use this to allow DRF to recognize a user authenticated 
-    via your custom session-based login.
-    """
-    def authenticate(self, request):
-        # Your custom login puts user_id in the session.
-        user_id = request.session.get('user_id')
+    
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
         
-        if user_id:
-            # If a user is identified by your session, load the User object.
-            # You must ensure the 'User' model is imported.
-            try:
-                from service.models import User
-                user = User.objects.get(user_id=user_id)
-                # DRF requires (user, auth) tuple
-                return (user, None)
-            except User.DoesNotExist:
-                return None
-        return None
+        # Get or create token
+        from rest_framework.authtoken.models import Token
+        token, created = Token.objects.get_or_create(user=user)
+        
+        # Also set session for web compatibility
+        request.session['user_id'] = user.user_id
+        request.session['username'] = user.username
+        request.session['role'] = user.role
+        request.session['full_name'] = user.full_name
+        
+        return Response({'token': token.key})
 
 
 
@@ -66,15 +62,43 @@ class CustomSessionAuthentication(SessionAuthentication):
 class HasCompanyAccess(BasePermission):
     """
     Custom permission to only allow access to resources the user is authorized for.
-    Based on the logic in the original HasCompanyAccess snippet.
+    Supports both session-based and token-based authentication.
     """
-    def has_permission(self, request, view):
-        # Must be logged in via session
-        return bool(request.session.get('user_id'))
-
-    def has_object_permission(self, request, view, obj):
+    def get_user_info(self, request):
+        """Get user and role from either session or token authentication"""
+        # Check if user is authenticated
+        if not request.user or not request.user.is_authenticated:
+            return None, None
+        
+        user = request.user
+        user_id = user.user_id
+        
+        # Try to get role from session first (for session auth)
         user_role = request.session.get('role')
-        user_id = request.session.get('user_id')
+        
+        # If no role in session, get it from user object (for token auth)
+        if not user_role:
+            user_role = user.role
+        
+        return user_id, user_role
+    
+    def has_permission(self, request, view):
+        # Must be authenticated (either via session or token)
+        if not request.user or not request.user.is_authenticated:
+            return False
+        
+        # For session auth, also check session
+        if hasattr(request, 'session') and request.session.get('user_id'):
+            return True
+        
+        # For token auth, user is already authenticated
+        return True
+    
+    def has_object_permission(self, request, view, obj):
+        user_id, user_role = self.get_user_info(request)
+        
+        if not user_id or not user_role:
+            return False
         
         if user_role == 'admin':
             return True
@@ -124,11 +148,17 @@ class HasCompanyAccess(BasePermission):
 class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [HasCompanyAccess]
-    authentication_classes = [CustomSessionAuthentication]
+    # Use HybridAuthentication to support both session and token auth
+    authentication_classes = [HybridAuthentication]
     
     def get_queryset(self):
-        user_role = self.request.session.get('role')
-        user_id = self.request.session.get('user_id')
+        # Get user info from either session or token
+        if self.request.user and self.request.user.is_authenticated:
+            user = self.request.user
+            user_role = self.request.session.get('role') or user.role
+            user_id = user.user_id
+        else:
+            return User.objects.none()
         
         if user_role == 'admin':
             return User.objects.all().order_by('user_id')
@@ -154,7 +184,7 @@ class UserViewSet(viewsets.ModelViewSet):
         return UserSerializer
 
     def create(self, request, *args, **kwargs):
-        user_role = request.session.get('role')
+        user_role = request.session.get('role') or (request.user.role if request.user.is_authenticated else None)
         if user_role not in ['admin', 'owner']:
             return Response({'detail': 'You are not allowed to create users.'}, status=status.HTTP_403_FORBIDDEN)
         
@@ -175,11 +205,15 @@ class UserViewSet(viewsets.ModelViewSet):
 class CompanyViewSet(viewsets.ModelViewSet):
     serializer_class = CompanySerializer
     permission_classes = [HasCompanyAccess]
-    authentication_classes = [CustomSessionAuthentication]
+    authentication_classes = [HybridAuthentication]
     
     def get_queryset(self):
-        user_id = self.request.session.get('user_id')
-        user_role = self.request.session.get('role')
+        if self.request.user and self.request.user.is_authenticated:
+            user = self.request.user
+            user_id = user.user_id
+            user_role = self.request.session.get('role') or user.role
+        else:
+            return Company.objects.none()
         
         if user_role == 'admin':
             return Company.objects.all()
@@ -197,11 +231,16 @@ class CompanyViewSet(viewsets.ModelViewSet):
 class StationViewSet(viewsets.ModelViewSet):
     serializer_class = StationSerializer
     permission_classes = [HasCompanyAccess]
-    authentication_classes = [CustomSessionAuthentication]
+    authentication_classes = [HybridAuthentication]
+    
     def get_queryset(self):
         # Uses the helper function to filter stations by user role/access
-        user_id = self.request.session.get('user_id')
-        user_role = self.request.session.get('role')
+        if self.request.user and self.request.user.is_authenticated:
+            user = self.request.user
+            user_id = user.user_id
+            user_role = self.request.session.get('role') or user.role
+        else:
+            return Station.objects.none()
         return get_user_stations(user_id, user_role)
 
     def perform_validation_and_save(self, serializer, instance=None):
@@ -263,11 +302,15 @@ class StationViewSet(viewsets.ModelViewSet):
 class PumpViewSet(viewsets.ModelViewSet):
     serializer_class = PumpSerializer
     permission_classes = [HasCompanyAccess]
-    authentication_classes = [CustomSessionAuthentication]
+    authentication_classes = [HybridAuthentication]
     
     def get_queryset(self):
-        user_id = self.request.session.get('user_id')
-        user_role = self.request.session.get('role')
+        if self.request.user and self.request.user.is_authenticated:
+            user = self.request.user
+            user_id = user.user_id
+            user_role = self.request.session.get('role') or user.role
+        else:
+            return Pump.objects.none()
         stations = get_user_stations(user_id, user_role)
         return Pump.objects.filter(station__in=stations).order_by('station__name', 'pump_number')
         
@@ -295,11 +338,15 @@ class PumpViewSet(viewsets.ModelViewSet):
 class InventoryViewSet(viewsets.ModelViewSet):
     serializer_class = InventorySerializer
     permission_classes = [HasCompanyAccess]
-    authentication_classes = [CustomSessionAuthentication]
+    authentication_classes = [HybridAuthentication]
     
     def get_queryset(self):
-        user_id = self.request.session.get('user_id')
-        user_role = self.request.session.get('role')
+        if self.request.user and self.request.user.is_authenticated:
+            user = self.request.user
+            user_id = user.user_id
+            user_role = self.request.session.get('role') or user.role
+        else:
+            return Inventory.objects.none()
         stations = get_user_stations(user_id, user_role)
         return Inventory.objects.filter(station_id__in=stations)
 
@@ -319,8 +366,9 @@ class InventoryViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         # Enforce role-based update logic (Owners/Admins only)
+        user_role = request.session.get('role') or (request.user.role if request.user.is_authenticated else None)
         
-        if self.request.session.get('role') == 'manager':
+        if user_role == 'manager':
             return Response({'detail': 'Managers cannot update inventory prices/levels via API.'}, 
                             status=status.HTTP_403_FORBIDDEN)
                             
@@ -344,11 +392,15 @@ class InventoryViewSet(viewsets.ModelViewSet):
 class TransactionListViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = TransactionSerializer
     permission_classes = [HasCompanyAccess]
-    authentication_classes = [CustomSessionAuthentication]
+    authentication_classes = [HybridAuthentication]
 
     def get_queryset(self):
-        user_id = self.request.session.get('user_id')
-        user_role = self.request.session.get('role')
+        if self.request.user and self.request.user.is_authenticated:
+            user = self.request.user
+            user_id = user.user_id
+            user_role = self.request.session.get('role') or user.role
+        else:
+            return Transaction.objects.none()
         
         authorized_stations = get_user_stations(user_id, user_role)
         queryset = Transaction.objects.filter(station_id__in=authorized_stations)
@@ -391,7 +443,7 @@ class TransactionListViewSet(viewsets.ReadOnlyModelViewSet):
 class TransactionCreateAPIView(viewsets.GenericViewSet, viewsets.mixins.CreateModelMixin):
     serializer_class = TransactionCreateSerializer
     permission_classes = [HasCompanyAccess] 
-    authentication_classes = [CustomSessionAuthentication]
+    authentication_classes = [HybridAuthentication]
     
     def perform_create(self, serializer):
         # NOTE: This is where you would integrate the complex logic from 
@@ -410,11 +462,16 @@ class TransactionCreateAPIView(viewsets.GenericViewSet, viewsets.mixins.CreateMo
 class AlertViewSet(viewsets.ModelViewSet):
     serializer_class = AlertSerializer
     permission_classes = [HasCompanyAccess]
+    authentication_classes = [HybridAuthentication]
     http_method_names = ['get', 'patch', 'head', 'options'] # Restrict to Read and Status Update
     
     def get_queryset(self):
-        user_id = self.request.session.get('user_id')
-        user_role = self.request.session.get('role')
+        if self.request.user and self.request.user.is_authenticated:
+            user = self.request.user
+            user_id = user.user_id
+            user_role = self.request.session.get('role') or user.role
+        else:
+            return Alert.objects.none()
         stations = get_user_stations(user_id, user_role)
         # Filter alerts belonging to those stations and default to pending
         status_filter = self.request.query_params.get('status', None)

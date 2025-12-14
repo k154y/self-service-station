@@ -1,26 +1,71 @@
 from django.db import models
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from django.utils import timezone
+from datetime import timedelta
+import secrets
 
+
+
+# User Manager
+class UserManager(BaseUserManager):
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError('The Email field must be set')
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        if password:
+            from django.contrib.auth.hashers import make_password
+            user.password = make_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault('role', 'admin')
+        return self.create_user(email, password, **extra_fields)
 
 
 # Users
-
-class User(models.Model):
+class User(AbstractBaseUser):
     user_id = models.AutoField(primary_key=True)
     username = models.CharField(max_length=50, unique=True)
     full_name = models.CharField(max_length=100)
-    password=models.CharField(max_length=12)
-    email = models.EmailField(blank=True, null=True,unique=True)
+    email = models.EmailField(unique=True)
     ROLE_CHOICES = [
         ('admin', 'Admin'),
         ('owner', 'Owner'),
         ('manager', 'Manager'),
     ]
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='manager')
     created_at = models.DateTimeField(auto_now_add=True)
-    last_login = models.DateTimeField(blank=True, null=True)
+    
+    # Required fields for AbstractBaseUser
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username', 'full_name']
+    
+    objects = UserManager()
 
     def __str__(self):
+        return self.username or self.email
+    
+    def get_full_name(self):
+        return self.full_name
+    
+    def get_short_name(self):
         return self.username
+    
+    @property
+    def is_staff(self):
+        return self.role == 'admin'
+    
+    @property
+    def is_superuser(self):
+        return self.role == 'admin'
+    
+    def has_perm(self, perm, obj=None):
+        return self.role == 'admin'
+    
+    def has_module_perms(self, app_label):
+        return self.role == 'admin'
 
 
 
@@ -193,3 +238,38 @@ class Alert(models.Model):
 
     def __str__(self):
         return f"Alert {self.alert_id} - {self.type}"
+
+
+# Password Reset Token
+class PasswordResetToken(models.Model):
+    token = models.CharField(max_length=64, unique=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_reset_tokens')
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    used = models.BooleanField(default=False)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Reset token for {self.user.email}"
+    
+    @classmethod
+    def generate_token(cls, user):
+        """Generate a new password reset token for a user"""
+        # Delete any existing unused tokens for this user
+        cls.objects.filter(user=user, used=False).delete()
+        
+        # Generate a secure random token
+        token = secrets.token_urlsafe(32)
+        expires_at = timezone.now() + timedelta(hours=24)  # Token valid for 24 hours
+        
+        return cls.objects.create(
+            token=token,
+            user=user,
+            expires_at=expires_at
+        )
+    
+    def is_valid(self):
+        """Check if token is valid and not expired"""
+        return not self.used and timezone.now() < self.expires_at

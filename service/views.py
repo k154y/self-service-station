@@ -11,6 +11,7 @@ from django.http import HttpResponseForbidden,JsonResponse
 from django.contrib.auth.decorators import user_passes_test
 from django.core.paginator import Paginator
 from django.db import transaction
+from django.contrib.auth.hashers import check_password
 
 
 
@@ -34,17 +35,23 @@ def landing_page(request):
         
         try:
             user = User.objects.get(email=email)
-            if user.password == password:
+            # Use check_password to verify hashed password
+            if check_password(password, user.password):
                 request.session['user_id'] = user.user_id
                 request.session['username'] = user.username
                 request.session['role'] = user.role
                 request.session['full_name'] = user.full_name
+                # Update last_login timestamp
+                user.last_login = timezone.now()
+                user.save(update_fields=['last_login'])
                 messages.success(request, f'Welcome back, {user.full_name}!')
                 return redirect('dashboard')
             else:
                 messages.error(request, 'Invalid credentials')
         except User.DoesNotExist:
-            messages.error(request, 'User does not exist')
+            messages.error(request, 'Invalid email or password')
+        except Exception as e:
+            messages.error(request, 'An error occurred. Please try again.')
     
     return render(request, 'landing.html')
 
@@ -109,17 +116,97 @@ def signup_page(request):
 
 
 def forgot_password(request):
-    """Forgot password page"""
+    """Forgot password - Step 1: Request reset token"""
     if request.method == 'POST':
         email = request.POST.get('email')
         try:
             user = User.objects.get(email=email)
-            messages.success(request, 'Please check your email for a confirmation link')
+            # Generate password reset token
+            reset_token = PasswordResetToken.generate_token(user)
+            
+            # Send email with reset link
+            from django.core.mail import send_mail
+            from django.urls import reverse
+            reset_url = request.build_absolute_uri(
+                reverse('reset_password', args=[reset_token.token])
+            )
+            
+            try:
+                send_mail(
+                    subject='Password Reset Request - Fuel Station',
+                    message=f'''
+Hello {user.full_name},
+
+You requested to reset your password for your Fuel Station account.
+
+Click the link below to reset your password:
+{reset_url}
+
+This link will expire in 24 hours.
+
+If you did not request this password reset, please ignore this email.
+
+Best regards,
+Fuel Station Team
+                    ''',
+                    from_email=None,  # Uses DEFAULT_FROM_EMAIL from settings
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+                messages.success(request, 'Password reset link has been sent to your email address.')
+            except Exception as e:
+                # If email sending fails, still show success message for security
+                # In production, log the error
+                messages.success(request, 'If an account exists with this email, a password reset link has been sent.')
+            
             return redirect('landing_page')
         except User.DoesNotExist:
-            messages.error(request, 'Email not found')
+            # Don't reveal if email exists or not (security best practice)
+            messages.success(request, 'If an account exists with this email, a password reset link has been sent.')
+            return redirect('landing_page')
     
     return render(request, 'forgot_password.html')
+
+
+def reset_password(request, token):
+    """Forgot password - Step 2: Reset password with token"""
+    try:
+        reset_token = PasswordResetToken.objects.get(token=token)
+        
+        if not reset_token.is_valid():
+            messages.error(request, 'This password reset link has expired or has already been used.')
+            return redirect('forgot_password')
+        
+        if request.method == 'POST':
+            password = request.POST.get('password')
+            password_confirm = request.POST.get('password_confirm')
+            
+            # Validate passwords
+            if password != password_confirm:
+                messages.error(request, 'Passwords do not match.')
+                return render(request, 'reset_password.html', {'token': token, 'valid': True})
+            
+            if len(password) < 6:
+                messages.error(request, 'Password must be at least 6 characters long.')
+                return render(request, 'reset_password.html', {'token': token, 'valid': True})
+            
+            # Update user password
+            from django.contrib.auth.hashers import make_password
+            reset_token.user.password = make_password(password)
+            reset_token.user.save(update_fields=['password'])
+            
+            # Mark token as used
+            reset_token.used = True
+            reset_token.save()
+            
+            messages.success(request, 'Your password has been reset successfully. Please login with your new password.')
+            return redirect('landing_page')
+        
+        return render(request, 'reset_password.html', {'token': token, 'valid': True})
+        
+    except PasswordResetToken.DoesNotExist:
+        messages.error(request, 'Invalid password reset link.')
+        return redirect('forgot_password')
 
 def user_logout(request):
     """Logout user"""

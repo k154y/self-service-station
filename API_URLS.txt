@@ -1,0 +1,100 @@
+# All API Endpoints - Copy and Paste for Postman
+
+# ============================================
+# AUTHENTICATION
+# ============================================
+POST http://localhost:8000/api/v1/auth/token/
+
+# ============================================
+# USERS
+# ============================================
+GET http://localhost:8000/api/v1/users/
+GET http://localhost:8000/api/v1/users/1/
+POST http://localhost:8000/api/v1/users/
+PUT http://localhost:8000/api/v1/users/1/
+PATCH http://localhost:8000/api/v1/users/1/
+DELETE http://localhost:8000/api/v1/users/1/
+
+# ============================================
+# COMPANIES
+# ============================================
+GET http://localhost:8000/api/v1/companies/
+GET http://localhost:8000/api/v1/companies/1/
+POST http://localhost:8000/api/v1/companies/
+PUT http://localhost:8000/api/v1/companies/1/
+PATCH http://localhost:8000/api/v1/companies/1/
+DELETE http://localhost:8000/api/v1/companies/1/
+
+# ============================================
+# STATIONS
+# ============================================
+GET http://localhost:8000/api/v1/stations/
+GET http://localhost:8000/api/v1/stations/1/
+POST http://localhost:8000/api/v1/stations/
+PUT http://localhost:8000/api/v1/stations/1/
+PATCH http://localhost:8000/api/v1/stations/1/
+DELETE http://localhost:8000/api/v1/stations/1/
+
+# ============================================
+# PUMPS
+# ============================================
+GET http://localhost:8000/api/v1/pumps/
+GET http://localhost:8000/api/v1/pumps/1/
+POST http://localhost:8000/api/v1/pumps/
+PUT http://localhost:8000/api/v1/pumps/1/
+PATCH http://localhost:8000/api/v1/pumps/1/
+DELETE http://localhost:8000/api/v1/pumps/1/
+PATCH http://localhost:8000/api/v1/pumps/1/status-update/
+
+# ============================================
+# INVENTORY
+# ============================================
+GET http://localhost:8000/api/v1/inventory/
+GET http://localhost:8000/api/v1/inventory/1/
+PATCH http://localhost:8000/api/v1/inventory/1/
+
+# ============================================
+# TRANSACTIONS
+# ============================================
+GET http://localhost:8000/api/v1/transactions/
+GET http://localhost:8000/api/v1/transactions/1/
+POST http://localhost:8000/api/v1/transactions/create/
+
+# Transaction Filters (add as query parameters)
+GET http://localhost:8000/api/v1/transactions/?search=ABC123
+GET http://localhost:8000/api/v1/transactions/?duration=24hrs
+GET http://localhost:8000/api/v1/transactions/?duration=week
+GET http://localhost:8000/api/v1/transactions/?duration=month
+GET http://localhost:8000/api/v1/transactions/?payment_method=cash
+GET http://localhost:8000/api/v1/transactions/?payment_method=momo
+GET http://localhost:8000/api/v1/transactions/?payment_method=card
+GET http://localhost:8000/api/v1/transactions/?station_id=1
+GET http://localhost:8000/api/v1/transactions/?search=Petrol&duration=24hrs&payment_method=cash
+
+# ============================================
+# ALERTS
+# ============================================
+GET http://localhost:8000/api/v1/alerts/
+GET http://localhost:8000/api/v1/alerts/1/
+PATCH http://localhost:8000/api/v1/alerts/1/
+
+# Alert Filters (add as query parameters)
+GET http://localhost:8000/api/v1/alerts/?status=pending
+GET http://localhost:8000/api/v1/alerts/?status=resolved
+GET http://localhost:8000/api/v1/alerts/?status=ignored
+GET http://localhost:8000/api/v1/alerts/?type=inventory
+GET http://localhost:8000/api/v1/alerts/?type=security
+GET http://localhost:8000/api/v1/alerts/?type=maintenance
+GET http://localhost:8000/api/v1/alerts/?type=system
+GET http://localhost:8000/api/v1/alerts/?company_id=1
+GET http://localhost:8000/api/v1/alerts/?station_id=1
+GET http://localhost:8000/api/v1/alerts/?status=pending&type=inventory
+
+# ============================================
+# NOTES
+# ============================================
+# - Replace {1} with actual IDs
+# - All POST/PUT/PATCH require JSON body
+# - Add Authorization header: "Token your-token-here" (after getting token from /auth/token/)
+# - Or use session authentication (login via web first)
+

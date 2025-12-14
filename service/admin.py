@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Company, Station, Pump, SystemSetting, Inventory, Transaction, Alert
+from .models import User, Company, Station, Pump, SystemSetting, Inventory, Transaction, Alert, PasswordResetToken
 
 
 # User Admin
@@ -71,3 +71,14 @@ class AlertAdmin(admin.ModelAdmin):
     list_display = ('alert_id', 'station', 'type', 'description', 'pump_id', 'inventory_id', 'status', 'created_at')
 
 admin.site.register(Alert, AlertAdmin)
+
+
+# Password Reset Token Admin
+
+class PasswordResetTokenAdmin(admin.ModelAdmin):
+    list_display = ('token', 'user', 'created_at', 'expires_at', 'used')
+    list_filter = ('used', 'created_at')
+    readonly_fields = ('token', 'created_at', 'expires_at')
+    search_fields = ('user__email', 'user__username', 'token')
+
+admin.site.register(PasswordResetToken, PasswordResetTokenAdmin)
