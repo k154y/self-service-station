@@ -109,3 +109,4 @@ If you have existing users and want to preserve them:
 - **Email is now the primary identifier** for authentication
 - **Username is still required** but not used for login
 
+

@@ -98,3 +98,4 @@ GET http://localhost:8000/api/v1/alerts/?status=pending&type=inventory
 # - Add Authorization header: "Token your-token-here" (after getting token from /auth/token/)
 # - Or use session authentication (login via web first)
 
+

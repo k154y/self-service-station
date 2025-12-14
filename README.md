@@ -134,19 +134,28 @@ self-service-station/
 
 - ✅ Password hashing with Django's default hasher
 - ✅ Secure password reset with token-based system
+- ✅ Welcome emails for new user registrations
 - ✅ Session-based authentication
 - ✅ CSRF protection
 - ✅ Role-based access control
 - ✅ SQL injection protection (Django ORM)
 - ✅ XSS protection
 
-## Password Reset Flow
+## Email Features
 
+### Welcome Emails
+- New users receive a welcome email when they register via signup page
+- Admins/Owners receive notification when they create new users
+- Email includes account details and login instructions
+
+### Password Reset Flow
 1. User requests password reset via `/forgot-password/`
 2. System generates a secure token and sends email
 3. User clicks link in email to `/reset-password/<token>/`
 4. User sets new password
 5. Token is invalidated after use
+
+**Note:** See `EMAIL_SETUP.md` for detailed email configuration instructions.
 
 ## Development
 
@@ -171,7 +180,7 @@ See `DEPLOYMENT.md` for detailed production deployment instructions.
 
 ## Configuration
 
-### Email Setup (for password reset)
+### Email Setup (for password reset and welcome emails)
 
 Update `station/settings.py` or set environment variables:
 

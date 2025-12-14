@@ -35,3 +35,4 @@ python manage.py createsuperuser
 
 echo "✅ Done! Database has been reset and fixed."
 
+

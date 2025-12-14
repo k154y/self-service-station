@@ -109,7 +109,49 @@ def signup_page(request):
                 role=role
             )
 
-            messages.success(request, 'Account created successfully! Please login.')
+            # Send welcome email to the new user
+            from django.core.mail import send_mail
+            from django.conf import settings
+            
+            subject = 'Welcome to Fuel Station Management System'
+            message = f'''
+Hello {user.full_name},
+
+Welcome to the Fuel Station Management System!
+
+Your account has been successfully created with the following details:
+
+Username: {user.username}
+Email: {user.email}
+Role: {user.role.title()}
+
+You can now log in to the system using your email and password.
+
+If you have any questions or need assistance, please don't hesitate to contact our support team.
+
+Best regards,
+Fuel Station Management Team
+            '''
+            
+            from_email = settings.DEFAULT_FROM_EMAIL
+            
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=from_email,
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+            except Exception as e:
+                # Log the error but don't prevent user creation
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f'Failed to send welcome email: {str(e)}')
+                # Still show success message even if email fails
+                messages.warning(request, 'Account created successfully, but we could not send a welcome email. Please check your email settings.')
+
+            messages.success(request, 'Account created successfully!')
             return redirect('landing_page')
 
     return render(request, 'signup.html')
@@ -161,19 +203,25 @@ Fuel Station Team
                     recipient_list=[user.email],
                     fail_silently=False,
                 )
-                messages.success(request, f'Password reset link has been sent to {user.email}. Please check your email.')
+                messages.success(request, f'Password reset link has been sent to {user.email}. Please check your email (including spam folder).')
             except Exception as e:
                 # Log the error for debugging
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.error(f'Failed to send password reset email: {str(e)}')
                 
+                # Provide helpful error message
+                error_msg = str(e)
+                if 'authentication' in error_msg.lower() or 'login' in error_msg.lower():
+                    messages.error(request, 'Email authentication failed. Please check your EMAIL_HOST_USER and EMAIL_HOST_PASSWORD settings in settings.py or environment variables.')
+                elif 'connection' in error_msg.lower():
+                    messages.error(request, 'Could not connect to email server. Please check your EMAIL_HOST and EMAIL_PORT settings.')
+                else:
+                    messages.error(request, f'Failed to send email: {error_msg}. Please check your email configuration.')
+                
                 # For development: show the reset URL in a message if email fails
                 if settings.DEBUG:
-                    messages.info(request, f'Email sending failed (check email settings). Reset URL: {reset_url}')
-                else:
-                    # In production, don't reveal if email exists or not (security)
-                    messages.success(request, 'If an account exists with this email, a password reset link has been sent.')
+                    messages.info(request, f'DEBUG: Reset URL would be: {reset_url}')
             
             return redirect('landing_page')
         except User.DoesNotExist:
@@ -448,6 +496,54 @@ class UserCreateView(CustomLoginRequiredMixin, CreateView):
             from django.contrib.auth.hashers import make_password
             user.password = make_password(form.cleaned_data['password'])
         user.save()
+
+        # Send welcome email to the newly created user
+        from django.core.mail import send_mail
+        from django.conf import settings
+        
+        # Get the creator's name for the email
+        try:
+            creator = User.objects.get(user_id=self.request.session.get('user_id'))
+            creator_name = creator.full_name or creator.username
+        except User.DoesNotExist:
+            creator_name = "Administrator"
+        
+        subject = 'Your Account Has Been Created - Fuel Station Management System'
+        message = f'''
+Hello {user.full_name},
+
+Your account has been successfully created by {creator_name} in the Fuel Station Management System.
+
+Your account details:
+
+Username: {user.username}
+Email: {user.email}
+Role: {user.role.title()}
+
+You can now log in to the system using your email and password.
+
+If you have any questions or need assistance, please don't hesitate to contact our support team.
+
+Best regards,
+Fuel Station Management Team
+            '''
+        
+        from_email = settings.DEFAULT_FROM_EMAIL
+        
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=from_email,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+        except Exception as e:
+            # Log the error but don't prevent user creation
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f'Failed to send welcome email to {user.email}: {str(e)}')
+            messages.warning(self.request, f'User created successfully, but we could not send a welcome email to {user.email}. Please check your email settings.')
 
         messages.success(self.request, "User created successfully!")
         return redirect(self.success_url)

@@ -463,3 +463,4 @@ http://localhost:8000/api/v1/alerts/1/
 - Query parameters can be combined (e.g., `?status=pending&type=inventory`)
 - Role-based access control applies - Admin sees all, Owner sees their companies, Manager sees assigned stations
 
+

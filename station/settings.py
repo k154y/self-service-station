@@ -150,14 +150,37 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',  # Fallback
 ]
 
-# Email Configuration (for password reset)
-EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')  # Use console for development
+# Email Configuration (for password reset and welcome emails)
+# ============================================================
+# IMPORTANT: Configure these settings to enable email sending
+# ============================================================
+# 
+# For Gmail:
+# 1. Enable 2-Step Verification in your Google Account
+# 2. Generate an App Password: Google Account → Security → App passwords
+# 3. Copy the 16-character app password
+# 4. Update EMAIL_HOST_USER and EMAIL_HOST_PASSWORD below
+#
+# For testing (emails print to console):
+# Set EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@fuelstation.com')
+
+# ============================================================
+# REQUIRED: Set your email credentials here
+# ============================================================
+# Option 1: Set directly (replace with your actual values)
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'yveskwizera154@gmail.com')  # YOUR GMAIL ADDRESS
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'urtq ersn cwha gxzf')  # YOUR GMAIL APP PASSWORD (16 characters)
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'noreply@fuelstation.com')
+
+# Option 2: Use environment variables (recommended for production)
+# Create a .env file with:
+# EMAIL_HOST_USER=kwizerayves154@gmail.com
+# EMAIL_HOST_PASSWORD=your-16-char-app-password
 
 # Session Configuration
 SESSION_COOKIE_AGE = 86400  # 24 hours

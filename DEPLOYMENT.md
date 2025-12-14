@@ -160,3 +160,4 @@ For password reset functionality to work, configure email settings:
 - Ensure migrations are up to date
 - Verify database user permissions
 
+

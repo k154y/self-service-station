@@ -163,3 +163,4 @@ If the scripts don't work, fix manually:
 - **Option 2 (Fix)** preserves data but requires more steps
 - The migrations have been updated to handle these issues automatically in the future
 
+

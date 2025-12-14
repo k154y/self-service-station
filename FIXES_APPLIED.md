@@ -91,3 +91,4 @@ Set `EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'` to see em
 2. `templates/base.html` - Updated profile icon display
 3. Email configuration in `forgot_password()` function
 
+
